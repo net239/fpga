@@ -3,10 +3,10 @@
 #project files
 
 add_file -vhdl -lib work "led_switch.vhd" 
-add_file -vhdl -lib work "Binary_To_7Segment.vhd" 
-add_file -vhdl -lib work "Debounce_Switch.vhd" 
 add_file -vhdl -lib work "Project_7_Segment_Top.vhd" 
-add_file -constraint -lib work "Go_Board_Clock_Constraint.sdc"
+add_file -vhdl -lib work "../modules/goboard/Binary_To_7Segment.vhd" 
+add_file -vhdl -lib work "../modules/goboard/Debounce_Switch.vhd" 
+add_file -constraint -lib work "../modules/goboard/Go_Board_Clock_Constraint.sdc"
 #implementation: "led_switch_Implmnt"
 impl -add led_switch_Implmnt -type fpga
 
