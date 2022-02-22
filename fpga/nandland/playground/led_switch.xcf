@@ -17,9 +17,9 @@
 				<BScanLen>1</BScanLen>
 				<BScanVal>0</BScanVal>
 			</Bypass>
-			<File>C:/lscc/iCEcube2.2020.12/sbt_backend/Projects/led_switch/led_switch_Implmnt/sbt/outputs/bitmap/Switches_to_LEDs_bitmap.bin</File>
-			<FileTime>02/19/22 19:43:44</FileTime>
-			<JedecChecksum>0xADC4</JedecChecksum>
+			<File>D:/jsahni/projects/fpga/nandland/playground/led_switch_Implmnt/sbt/outputs/bitmap/Project_7_Segment_Top_bitmap.bin</File>
+			<FileTime>02/22/22 11:45:50</FileTime>
+			<JedecChecksum>0x42DB</JedecChecksum>
 			<Operation>SPI Flash Erase,Program,Verify</Operation>
 			<Option>
 				<SVFVendor>JTAG STANDARD</SVFVendor>
@@ -59,9 +59,9 @@
 					<IDCode>0x10</IDCode>
 					<Package>8-pin SOIC</Package>
 					<Operation>SPI Flash Erase,Program,Verify</Operation>
-					<File>C:/lscc/iCEcube2.2020.12/sbt_backend/Projects/led_switch/led_switch_Implmnt/sbt/outputs/bitmap/Switches_to_LEDs_bitmap.bin</File>
+					<File>D:/jsahni/projects/fpga/nandland/playground/led_switch_Implmnt/sbt/outputs/bitmap/Project_7_Segment_Top_bitmap.bin</File>
 					<AddressBase>0x00000000</AddressBase>
-					<EndAddress>0x00018000</EndAddress>
+					<EndAddress>0x00008000</EndAddress>
 					<DeviceSize>1</DeviceSize>
 					<DataSize>32300</DataSize>
 					<NumberOfDevices>1</NumberOfDevices>
@@ -92,6 +92,7 @@
 		<OperationOverride>No Override</OperationOverride>
 		<StartTAP>TLR</StartTAP>
 		<EndTAP>TLR</EndTAP>
+		<DisableCheckBoard value="TRUE"/>
 		<VerifyUsercode value="FALSE"/>
 		<TCKDelay>1</TCKDelay>
 	</ProjectOptions>
