@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
  
-entity Project_7_Segment_Top is
+entity Seven_Segment_LED_Counter is
   port (
     -- Main Clock (25 MHz)
     i_Clk         : in std_logic;
@@ -31,9 +31,9 @@ entity Project_7_Segment_Top is
     o_Segment2_F  : out std_logic;
     o_Segment2_G  : out std_logic
 );
-end entity Project_7_Segment_Top;
+end entity Seven_Segment_LED_Counter;
  
-architecture RTL of Project_7_Segment_Top is
+architecture RTL of Seven_Segment_LED_Counter is
  
   signal w_Switch_1 : std_logic;
   signal r_Switch_1 : std_logic := '0';

@@ -1,14 +1,13 @@
 #-- Synopsys, Inc.
-#-- Project file D:\jsahni\projects\fpga\nandland\playground\led_switch_syn.prj
+#-- Project file D:\jsahni\projects\fpga\nandland\playground\go_board_playground_syn.prj
 #project files
 
-add_file -vhdl -lib work "led_switch.vhd" 
-add_file -vhdl -lib work "Project_7_Segment_Top.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Binary_To_7Segment.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Debounce_Switch.vhd" 
+add_file -vhdl -lib work "Seven_Segment_LED/Seven_Segment_LED_Counter.vhd" 
 add_file -constraint -lib work "../modules/goboard/Go_Board_Clock_Constraint.sdc"
-#implementation: "led_switch_Implmnt"
-impl -add led_switch_Implmnt -type fpga
+#implementation: "go_board_playground_Implmnt"
+impl -add go_board_playground_Implmnt -type fpga
 
 #implementation attributes
 set_option -vlog_std v2001
@@ -54,7 +53,7 @@ set_option -write_apr_constraint 1
 
 #set result format/file last
 project -result_format "edif"
-project -result_file ./led_switch_Implmnt/led_switch.edf
-project -log_file "./led_switch_Implmnt/led_switch.srr"
-impl -active led_switch_Implmnt
+project -result_file ./go_board_playground_Implmnt/go_board_playground.edf
+project -log_file "./go_board_playground_Implmnt/go_board_playground.srr"
+impl -active go_board_playground_Implmnt
 project -run synthesis -clean
