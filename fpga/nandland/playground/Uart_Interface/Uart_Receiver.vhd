@@ -78,7 +78,7 @@ begin
         o_Segment_G  => w_Segment2_G
     );
         
-    -- these are all NOTbecuase Go bard makes LED light up when its low
+    -- these are all NOT becuase Go board makes LED light up when its low
     o_Segment2_A <= not w_Segment2_A;
     o_Segment2_B <= not w_Segment2_B;
     o_Segment2_C <= not w_Segment2_C;
