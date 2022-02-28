@@ -28,7 +28,21 @@ entity Uart_Receiver is
         o_Segment2_D  : out std_logic;
         o_Segment2_E  : out std_logic;
         o_Segment2_F  : out std_logic;
-        o_Segment2_G  : out std_logic
+        o_Segment2_G  : out std_logic;
+
+        -- vga
+        o_VGA_HSync : out std_logic;
+        o_VGA_VSync : out std_logic;
+
+        o_VGA_Red_0 : out std_logic;
+        o_VGA_Red_1 : out std_logic;
+        o_VGA_Red_2 : out std_logic;
+        o_VGA_Grn_0 : out std_logic;
+        o_VGA_Grn_1 : out std_logic;
+        o_VGA_Grn_2 : out std_logic;
+        o_VGA_Blu_0 : out std_logic;
+        o_VGA_Blu_1 : out std_logic;
+        o_VGA_Blu_2 : out std_logic
     );
 end entity Uart_Receiver;
 
@@ -45,7 +59,12 @@ architecture RTL of Uart_Receiver is
     signal w_Segment1_E, w_Segment2_E : std_logic;
     signal w_Segment1_F, w_Segment2_F : std_logic;
     signal w_Segment1_G, w_Segment2_G : std_logic;
-begin
+
+    signal r_isVideoOn     : std_logic;
+    signal r_hPos  : integer range 0 to 800 := 0;
+    signal r_vPos  : integer range 0 to 524:= 0;
+
+  begin
     
     -- instantiate UART receiver
     Uart_Rx_Inst : entity work.Uart_Rx
@@ -64,6 +83,21 @@ begin
             o_Uart_Tx_Active => r_Uart_Tx_Active,
             i_Byte_To_Send => r_byte_read,
             i_Byte_Ready_To_send => r_byte_read_ready
+    );
+
+    -- Instantiate VGA driver
+    Vga_Driver_Inst : entity work.Vga_Driver
+        port map (
+            i_Clk        => i_Clk,
+            o_hPos  => r_hPos,
+            o_vPos  => r_vPos,
+    
+            --output - is video on 
+            o_isVideoOn => r_isVideoOn,
+    
+            --output hSync and vSync
+            o_hSync => o_VGA_HSync,
+            o_vSync => o_VGA_VSync
     );
 
     -- Instantiate Binary to 7-Segment Converter
@@ -113,5 +147,49 @@ begin
 
     -- send output only when UART TX is active
     o_UART_TX <= r_UART_TX   when r_Uart_Tx_Active = '1'  else '1';
-    
+
+    process_draw : process (i_Clk)
+    begin
+        if rising_edge(i_Clk) then
+            if r_isVideoOn = '1' then
+                if r_hPos < 10 then
+                    o_VGA_Red_0 <= '1';
+                    o_VGA_Red_1 <= '1';
+                    o_VGA_Red_2 <= '1';
+
+                    o_VGA_Grn_0 <= '1';
+                    o_VGA_Grn_1 <= '1';
+                    o_VGA_Grn_1 <= '1';
+
+                    o_VGA_Blu_0 <= '1';
+                    o_VGA_Blu_1 <= '1';
+                    o_VGA_Blu_2 <= '1';
+                else
+                    o_VGA_Red_0 <= '0';
+                    o_VGA_Red_1 <= '0';
+                    o_VGA_Red_2 <= '0';
+
+                    o_VGA_Grn_0 <= '0';
+                    o_VGA_Grn_1 <= '0';
+                    o_VGA_Grn_1 <= '0';
+
+                    o_VGA_Blu_0 <= '0';
+                    o_VGA_Blu_1 <= '0';
+                    o_VGA_Blu_2 <= '0';
+                end if;
+            else
+                o_VGA_Red_0 <= '0';
+                o_VGA_Red_1 <= '0';
+                o_VGA_Red_2 <= '0';
+
+                o_VGA_Grn_0 <= '0';
+                o_VGA_Grn_1 <= '0';
+                o_VGA_Grn_1 <= '0';
+
+                o_VGA_Blu_0 <= '0';
+                o_VGA_Blu_1 <= '0';
+                o_VGA_Blu_2 <= '0';
+            end if;
+        end if; 
+    end process process_draw;
 end architecture RTL;    
