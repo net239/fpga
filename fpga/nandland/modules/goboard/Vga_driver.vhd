@@ -148,7 +148,7 @@ begin
         end if;
     end process process_driveVerticalBeam;
 
-    process_setActiveVideo  : process (i_Clk,r_VGAHorizontalStateMachine,r_VGAVerticalStateMachine ) 
+    process_setActiveVideo  : process (i_Clk,r_hPos,r_vPos ) 
     begin 
         if rising_edge(i_Clk) then            
             if (r_hPos < g_hActiveVideo  ) and (r_vPos <  g_vActiveVideo  )  then

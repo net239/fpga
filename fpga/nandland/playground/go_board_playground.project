@@ -4,7 +4,7 @@ Version=Lattice Semiconductor Corporation iCEcube - Release: 2020.12.27943 - Bui
 ProjectName=go_board_playground
 Vendor=SiliconBlue
 Synthesis=synplify
-ProjectVFiles=../modules/goboard/Binary_To_7Segment.vhd=work,../modules/goboard/Debounce_Switch.vhd=work,../modules/goboard/Uart_Rx.vhd=work,Uart_Interface/Uart_Receiver.vhd=work,../modules/goboard/Uart_Tx.vhd=work,../modules/goboard/Vga_driver.vhd
+ProjectVFiles=../modules/goboard/Binary_To_7Segment.vhd=work,../modules/goboard/Debounce_Switch.vhd=work,../modules/goboard/Uart_Rx.vhd=work,Uart_Interface/Uart_Receiver.vhd=work,../modules/goboard/Uart_Tx.vhd=work,../modules/goboard/Vga_driver.vhd=work
 ProjectCFiles=../modules/goboard/Go_Board_Clock_Constraint.sdc
 CurImplementation=go_board_playground_Implmnt
 Implementations=go_board_playground_Implmnt
