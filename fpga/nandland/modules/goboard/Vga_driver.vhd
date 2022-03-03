@@ -36,132 +36,142 @@ end entity Vga_Driver;
 
 architecture RTL of Vga_Driver is
 
-    signal r_hPos  : integer range 0 to 800 := 0;
-    signal r_vPos  : integer range 0 to 524:= 0;
+    signal r_hPos  : integer range 0 	to (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1) 
+    				 					:= 0;
+    signal r_vPos  : integer range 0 to  (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse + g_vBackPorch - 1) 
+    									:= 0 ;
     signal r_hSync : std_logic := '0';
     signal r_vSync : std_logic := '0';
-    signal r_isVideoOn : std_logic := '0';
-
-    type VGAStateMachine is ( 
-                state_Idle, state_ActiveVideo, state_FrontPorch, state_SyncPulse, state_BackPorch
-            );
-    signal r_VGAHorizontalStateMachine : VGAStateMachine := state_Idle;
-    signal r_VGAVerticalStateMachine : VGAStateMachine := state_Idle;
+    signal r_hVideoOn : std_logic := '0';
+    signal r_vVideoOn : std_logic := '0';
+    signal r_reset : std_logic := '1';
 
 begin
 
     --process drives the horizontal beam
-    process_driveHorizontalBeam : process (i_Clk)
+    process_driveHorizontalBeam : process (i_Clk, r_reset)
     begin
         if rising_edge(i_Clk) then
-            case r_VGAHorizontalStateMachine is
-            when state_Idle =>   
-                r_hPos <= 0;
-                r_hSync <= '1';
-                r_VGAHorizontalStateMachine <= state_ActiveVideo;
-            when state_ActiveVideo => 
-                if r_hPos < (g_hActiveVideo - 1 ) then
-                    r_hSync <= '1';
-                    r_hPos <= r_hPos + 1;
-                elsif r_hPos = (g_hActiveVideo - 1) then
-                    r_hSync <= '1';
-                    r_hPos <= r_hPos + 1;
-                    r_VGAHorizontalStateMachine <= state_FrontPorch;
-                end if;
-            when state_FrontPorch => 
-                if r_hPos < (g_hActiveVideo + g_hFrontPorch - 1)  then
-                    r_hSync <= '1';
-                    r_hPos <= r_hPos + 1;
-                elsif r_hPos = (g_hActiveVideo + g_hFrontPorch - 1)  then
-                    r_hSync <= '0';
-                    r_hPos <= r_hPos + 1;
-                    r_VGAHorizontalStateMachine <= state_SyncPulse;
-                end if;
-            when state_SyncPulse => 
-                if r_hPos < (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse - 1)  then
-                    r_hSync <= '0';
-                    r_hPos <= r_hPos + 1;
-                elsif r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse - 1)  then
-                    r_hSync <= '1';
-                    r_hPos <= r_hPos + 1;
-                    r_VGAHorizontalStateMachine <= state_BackPorch;
-                end if;
-            when state_BackPorch => 
-                if r_hPos < (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then
-                    r_hSync <= '1';
-                    r_hPos <= r_hPos + 1;
-                elsif r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then
-                    r_hSync <= '1';
-                    r_hPos <= 0;
-                    r_VGAHorizontalStateMachine <= state_ActiveVideo;
-                end if;
-            when others =>
-                r_VGAHorizontalStateMachine <= state_Idle;
-            end case;
-        end if;
-    end process process_driveHorizontalBeam;
-
-    process_driveVerticalBeam : process (i_Clk , r_hPos )
-    begin
-        if rising_edge(i_Clk) then
-            if r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then
-                r_vPos <= r_vPos + 1;  -- important increment vertical beam , when at end of horizontal line
+        	if r_reset = '1' then
+            	r_hPos <= 0;
+            else
+              -- check if we are at the end of horizental beam scan  	
+              if r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then
+                  r_hPos <= 0;
+              else 
+                  r_hPos <= r_hPos + 1;
+              end if;
             end if;
-
-            case r_VGAVerticalStateMachine is
-            when state_Idle =>   
-                r_vPos <= 0;
-                r_vSync <= '1';
-                r_VGAVerticalStateMachine <= state_ActiveVideo;    
-            when state_ActiveVideo => 
-                if r_vPos < (g_vActiveVideo - 1 ) then
-                    r_vSync <= '1';
-                elsif r_vPos = (g_vActiveVideo - 1) then
-                    r_vSync <= '1';
-                    r_VGAVerticalStateMachine <= state_FrontPorch;
+        end if;
+   end process process_driveHorizontalBeam;
+            
+   
+    process_driveVerticalBeam : process (i_Clk , r_reset, r_hPos )
+    begin
+        if rising_edge(i_Clk) then  
+            if r_reset = '1' then
+            	r_vPos <= 0;
+            else
+            	-- check if we are at the end of horizental beam scan
+            	if r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1) then
+                	-- check if we are at the end of vertical beam scan
+                	if r_vPos = (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse + g_vBackPorch - 1)  then
+                    	r_vPos <= 0;
+                	else 
+                        r_vPos <= r_vPos + 1;
+                    end if;
                 end if;
-            when state_FrontPorch => 
-                if r_vPos < (g_vActiveVideo + g_vFrontPorch - 1)  then
-                    r_vSync <= '1';
-                elsif r_vPos = (g_vActiveVideo + g_vFrontPorch - 1)  then
-                    r_vSync <= '0';
-                    r_VGAVerticalStateMachine <= state_SyncPulse;
-                end if;
-            when state_SyncPulse => 
-                if r_vPos < (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse - 1)  then
-                    r_vSync <= '0';
-                elsif r_vPos = (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse - 1)  then
-                    r_vSync <= '1';
-                    r_VGAVerticalStateMachine <= state_BackPorch;
-                end if;
-            when state_BackPorch => 
-                if r_vPos < (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse + g_vBackPorch - 1)  then
-                    r_vSync <= '1';
-                elsif r_vPos = (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse + g_vBackPorch - 1)  then
-                    r_vSync <= '1';
-                    r_vPos <= 0;
-                    r_VGAVerticalStateMachine <= state_ActiveVideo;
-                end if;
-            when others =>
-                r_VGAVerticalStateMachine <= state_Idle;    
-            end case;
+             end if;
         end if;
     end process process_driveVerticalBeam;
 
-    process_setActiveVideo  : process (i_Clk,r_hPos,r_vPos ) 
+     
+    proces_setSyncHorizontal : process (i_Clk,r_reset, r_hPos ) 
     begin 
-        if rising_edge(i_Clk) then            
-            if (r_hPos < g_hActiveVideo  ) and (r_vPos <  g_vActiveVideo  )  then
-                r_isVideoOn <= '1';
+        if rising_edge(i_Clk) then   
+        	if r_reset = '1' then
+            	r_hSync <= '1';
             else
-                r_isVideoOn <= '0';
+              if (r_hPos >= g_hActiveVideo + g_hFrontPorch - 1)  and
+                 (r_hPos < g_hActiveVideo + g_hFrontPorch + g_hSyncPulse - 1)  then
+                  r_hSync <= '0';
+              else
+                  r_hSync <= '1';
+              end if;
             end if;
         end if;
-    end process process_setActiveVideo;
+    end process proces_setSyncHorizontal;
+    
+    proces_setSyncVertical : process (i_Clk,r_reset,r_vPos, r_hPos ) 
+    begin 
+        if rising_edge(i_Clk) then  
+        	if r_reset = '1' then
+            	r_vSync <= '1';
+            else
+              -- check if we are at the end of horizental beam scan  	
+              if r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then
+                -- set vSync to 0 when we are vertically inside sync area 
+                if (r_vPos >= g_vActiveVideo + g_vFrontPorch - 1)  and 
+                   (r_vPos < g_vActiveVideo + g_vFrontPorch + g_vSyncPulse - 1) then
+                    r_vSync <= '0';
+                else
+                    r_vSync <= '1';
+                end if;
+               end if;
+            end if;
+        end if;
+    end process proces_setSyncVertical;
+    
+    proces_setVideoOnHorizontal : process (i_Clk,r_reset, r_hPos ) 
+    begin 
+        if rising_edge(i_Clk) then   
+        	if r_reset = '1' then
+            	r_hVideoOn <= '1';
+            else
+              if (r_hPos >= g_hActiveVideo - 1)  then 
+                   -- check if we are at the end of horizental beam scan  
+              	  if r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then	
+                  	r_hVideoOn <= '1';
+                  else
+                  	r_hVideoOn <= '0';
+                  end if;
+              else
+                  r_hVideoOn <= '1';
+              end if;
+            end if;
+        end if;
+    end process proces_setVideoOnHorizontal;
+    
+    proces_setVideoOnVertical : process (i_Clk,r_reset,r_vPos, r_hPos ) 
+    begin 
+        if rising_edge(i_Clk) then  
+        	if r_reset = '1' then
+            	r_vVideoOn <= '1';
+            else
+                if (r_vPos >= g_vActiveVideo - 1)  then 
+                    -- check if we are at the end of vertical beam scan  	
+                    if r_vPos = (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse + g_vBackPorch - 1)  then
+                        r_vVideoOn <= '0';
+                    else
+                        r_vVideoOn <= '1';
+                    end if;
+                else
+                    r_vVideoOn <= '1';
+                end if;
+            end if;
+        end if;
+    end process proces_setVideoOnVertical;
+    
+    process_reset : process (i_Clk, r_reset)
+    begin
+    	if rising_edge(i_Clk) then    
+        	r_reset <= '0';
+        end if;
+    end process process_reset;
     
     o_vPos <= r_vPos;
     o_hPos <= r_hPos;
     o_hSync <= r_hSync;
     o_vSync <= r_vSync;
-    o_isVideoOn <= r_isVideoOn;
+    o_isVideoOn <= r_hVideoOn and r_vVideoOn;
 end;

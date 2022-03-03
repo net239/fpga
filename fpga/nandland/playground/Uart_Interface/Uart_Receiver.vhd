@@ -152,7 +152,7 @@ architecture RTL of Uart_Receiver is
     begin
         if rising_edge(i_Clk) then
             if r_isVideoOn = '1' then
-                if r_hPos = 0 or r_hPos = 639 or r_vPos = 0 or r_vPos = 479 then
+                if r_hPos mod 20 = 0 or r_hPos = 639 or r_vPos mod 20 = 0 or r_vPos = 479 then
                     o_VGA_Red_0 <= '1';
                     o_VGA_Red_1 <= '1';
                     o_VGA_Red_2 <= '1';
