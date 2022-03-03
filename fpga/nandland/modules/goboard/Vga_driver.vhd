@@ -65,7 +65,7 @@ begin
         end if;
    end process process_driveHorizontalBeam;
             
-   
+    -- drive the vertical beam
     process_driveVerticalBeam : process (i_Clk , r_reset, r_hPos )
     begin
         if rising_edge(i_Clk) then  
@@ -85,13 +85,15 @@ begin
         end if;
     end process process_driveVerticalBeam;
 
-     
+    
+    -- set the sync pulse for horizental beam
     proces_setSyncHorizontal : process (i_Clk,r_reset, r_hPos ) 
     begin 
         if rising_edge(i_Clk) then   
         	if r_reset = '1' then
             	r_hSync <= '1';
             else
+              -- |ACTIVE VIDEO|FRONT PORCH|*** HERE SYNC PULSE 0****|BACK PORCH| 
               if (r_hPos >= g_hActiveVideo + g_hFrontPorch - 1)  and
                  (r_hPos < g_hActiveVideo + g_hFrontPorch + g_hSyncPulse - 1)  then
                   r_hSync <= '0';
@@ -102,6 +104,7 @@ begin
         end if;
     end process proces_setSyncHorizontal;
     
+    -- set the sync pulse for vertical beam
     proces_setSyncVertical : process (i_Clk,r_reset,r_vPos, r_hPos ) 
     begin 
         if rising_edge(i_Clk) then  
@@ -111,6 +114,7 @@ begin
               -- check if we are at the end of horizental beam scan  	
               if r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then
                 -- set vSync to 0 when we are vertically inside sync area 
+                -- |ACTIVE VIDEO|FRONT PORCH|*** HERE SYNC PULSE 0****|BACK PORCH|
                 if (r_vPos >= g_vActiveVideo + g_vFrontPorch - 1)  and 
                    (r_vPos < g_vActiveVideo + g_vFrontPorch + g_vSyncPulse - 1) then
                     r_vSync <= '0';
@@ -121,7 +125,8 @@ begin
             end if;
         end if;
     end process proces_setSyncVertical;
-    
+
+    -- set the VideoOn when we are in area where pixels are active (visible) - Horizentally
     proces_setVideoOnHorizontal : process (i_Clk,r_reset, r_hPos ) 
     begin 
         if rising_edge(i_Clk) then   
@@ -130,6 +135,7 @@ begin
             else
               if (r_hPos >= g_hActiveVideo - 1)  then 
                    -- check if we are at the end of horizental beam scan  
+                   -- if we are at end, we should switch Active ON at end of the clock cycle
               	  if r_hPos = (g_hActiveVideo + g_hFrontPorch + g_hSyncPulse + g_hBackPorch - 1)  then	
                   	r_hVideoOn <= '1';
                   else
@@ -142,6 +148,7 @@ begin
         end if;
     end process proces_setVideoOnHorizontal;
     
+    -- set the VideoOn when we are in area where pixels are active (visible) - Vertically
     proces_setVideoOnVertical : process (i_Clk,r_reset,r_vPos, r_hPos ) 
     begin 
         if rising_edge(i_Clk) then  
@@ -150,6 +157,7 @@ begin
             else
                 if (r_vPos >= g_vActiveVideo - 1)  then 
                     -- check if we are at the end of vertical beam scan  	
+                    -- if we are at end, we should switch Active ON at end of the clock cycle
                     if r_vPos = (g_vActiveVideo + g_vFrontPorch + g_vSyncPulse + g_vBackPorch - 1)  then
                         r_vVideoOn <= '0';
                     else
@@ -162,6 +170,7 @@ begin
         end if;
     end process proces_setVideoOnVertical;
     
+    -- Process reset signal 
     process_reset : process (i_Clk, r_reset)
     begin
     	if rising_edge(i_Clk) then    
