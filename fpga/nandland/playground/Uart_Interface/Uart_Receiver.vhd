@@ -154,16 +154,16 @@ architecture RTL of Uart_Receiver is
             if r_isVideoOn = '1' then
                 if r_hPos mod 20 = 0 or r_hPos = 639 or r_vPos mod 20 = 0 or r_vPos = 479 then
                     o_VGA_Red_0 <= '1';
-                    o_VGA_Red_1 <= '1';
+                    o_VGA_Red_1 <= '0';
                     o_VGA_Red_2 <= '1';
 
-                    o_VGA_Grn_0 <= '0';
+                    o_VGA_Grn_0 <= '1';
                     o_VGA_Grn_1 <= '0';
-                    o_VGA_Grn_1 <= '0';
+                    o_VGA_Grn_1 <= '1';
 
-                    o_VGA_Blu_0 <= '0';
+                    o_VGA_Blu_0 <= '1';
                     o_VGA_Blu_1 <= '0';
-                    o_VGA_Blu_2 <= '0';
+                    o_VGA_Blu_2 <= '1';
                 else
                     o_VGA_Red_0 <= '0';
                     o_VGA_Red_1 <= '0';
