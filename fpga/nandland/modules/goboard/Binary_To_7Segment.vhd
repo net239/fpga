@@ -1,6 +1,8 @@
 library ieee;
 use ieee.std_logic_1164.all;
  
+-- converts given input 0-F to hexadecimal enciding for 7 segment display
+-- refer: https://en.wikipedia.org/wiki/Seven-segment_display
 entity Binary_To_7Segment is
   port (
     i_Clk        : in  std_logic;

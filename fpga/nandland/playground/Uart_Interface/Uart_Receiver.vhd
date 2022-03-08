@@ -64,6 +64,13 @@ architecture RTL of Uart_Receiver is
     signal r_hPos  : integer range 0 to 800 := 0;
     signal r_vPos  : integer range 0 to 524:= 0;
 
+    signal r_fontRow_Index:  integer;   -- row index of single pixel line in complete font set
+    signal r_fontPixels_row: std_logic_vector(font_en_crt.FONT_WIDTH-1 downto 0);  -- single pixel line at the above index
+
+    signal r_hTextPos : integer := 100;  -- horizental and vertical text poistion on display
+    signal r_vTextPos : integer := 100;
+
+    
   begin
     
     -- instantiate UART receiver
@@ -126,7 +133,18 @@ architecture RTL of Uart_Receiver is
         o_Segment_F  => w_Segment2_F,
         o_Segment_G  => w_Segment2_G
     );
-        
+
+    
+
+    --font for VGA driver
+    Font_en_Inst : entity work.Font_en_crt
+        port map (
+            i_Clk        => i_Clk,
+            i_fontRow_Index => r_fontRow_Index ,
+            o_fontPixels_row => r_fontPixels_row
+    );
+
+            
     -- these are all NOT becuase Go board makes LED light up when its low
     o_Segment2_A <= not w_Segment2_A;
     o_Segment2_B <= not w_Segment2_B;
@@ -148,48 +166,107 @@ architecture RTL of Uart_Receiver is
     -- send output only when UART TX is active
     o_UART_TX <= r_UART_TX   when r_Uart_Tx_Active = '1'  else '1';
 
-    process_draw : process (i_Clk)
+    -- process_draw : process (i_Clk)
+    -- begin
+    --     if rising_edge(i_Clk) then
+    --         if r_isVideoOn = '1' then
+    --             if r_hPos mod 20 = 0 or r_hPos = 639 or r_vPos mod 20 = 0 or r_vPos = 479 then
+    --                 o_VGA_Red_0 <= '1';
+    --                 o_VGA_Red_1 <= '0';
+    --                 o_VGA_Red_2 <= '1';
+
+    --                 o_VGA_Grn_0 <= '1';
+    --                 o_VGA_Grn_1 <= '0';
+    --                 o_VGA_Grn_1 <= '1';
+
+    --                 o_VGA_Blu_0 <= '1';
+    --                 o_VGA_Blu_1 <= '0';
+    --                 o_VGA_Blu_2 <= '1';
+    --             else
+    --                 o_VGA_Red_0 <= '0';
+    --                 o_VGA_Red_1 <= '0';
+    --                 o_VGA_Red_2 <= '0';
+
+    --                 o_VGA_Grn_0 <= '0';
+    --                 o_VGA_Grn_1 <= '0';
+    --                 o_VGA_Grn_1 <= '0';
+
+    --                 o_VGA_Blu_0 <= '0';
+    --                 o_VGA_Blu_1 <= '0';
+    --                 o_VGA_Blu_2 <= '0';
+    --             end if;
+    --         else
+    --             o_VGA_Red_0 <= '0';
+    --             o_VGA_Red_1 <= '0';
+    --             o_VGA_Red_2 <= '0';
+
+    --             o_VGA_Grn_0 <= '0';
+    --             o_VGA_Grn_1 <= '0';
+    --             o_VGA_Grn_1 <= '0';
+
+    --             o_VGA_Blu_0 <= '0';
+    --             o_VGA_Blu_1 <= '0';
+    --             o_VGA_Blu_2 <= '0';
+    --         end if;
+    --     end if; 
+    -- end process process_draw;
+
+    process_fontPixelRow : process (i_Clk)
+    begin
+        if rising_edge(i_Clk) then
+            r_fontRow_Index <=  to_integer(unsigned(r_byte_read)) + (r_vPos - r_vTextPos);
+        end if;
+    end process process_fontPixelRow;
+
+    process_write_text : process (i_Clk)
     begin
         if rising_edge(i_Clk) then
             if r_isVideoOn = '1' then
-                if r_hPos mod 20 = 0 or r_hPos = 639 or r_vPos mod 20 = 0 or r_vPos = 479 then
-                    o_VGA_Red_0 <= '1';
-                    o_VGA_Red_1 <= '0';
-                    o_VGA_Red_2 <= '1';
+                --check if current pixel position is inside the text area
+                if r_hPos >= r_hTextPos and r_hPos < r_hTextPos + font_en_crt.FONT_WIDTH and
+                    r_vPos >= r_vTextPos and r_vPos < r_vTextPos + font_en_crt.FONT_HEIGHT then
 
-                    o_VGA_Grn_0 <= '1';
-                    o_VGA_Grn_1 <= '0';
-                    o_VGA_Grn_1 <= '1';
+                        if r_fontPixels_row(r_hPos - r_hTextPos) = '1' then 
+                            o_VGA_Red_0 <= '1';
+                            o_VGA_Red_1 <= '1';
+                            o_VGA_Red_2 <= '1';
 
-                    o_VGA_Blu_0 <= '1';
-                    o_VGA_Blu_1 <= '0';
-                    o_VGA_Blu_2 <= '1';
+                            o_VGA_Grn_0 <= '0';
+                            o_VGA_Grn_1 <= '0';
+                            o_VGA_Grn_1 <= '0';
+            
+                            o_VGA_Blu_0 <= '0';
+                            o_VGA_Blu_1 <= '0';
+                            o_VGA_Blu_2 <= '0';
+                        else
+                            o_VGA_Red_0 <= '0' ;
+                            o_VGA_Red_1 <= '0';
+                            o_VGA_Red_2 <= '0';
+
+                            o_VGA_Grn_0 <= '0';
+                            o_VGA_Grn_1 <= '0';
+                            o_VGA_Grn_1 <= '0';
+            
+                            o_VGA_Blu_0 <= '1';
+                            o_VGA_Blu_1 <= '1';
+                            o_VGA_Blu_2 <= '1';
+                        end if;
+
+                        
                 else
-                    o_VGA_Red_0 <= '0';
-                    o_VGA_Red_1 <= '0';
-                    o_VGA_Red_2 <= '0';
-
-                    o_VGA_Grn_0 <= '0';
-                    o_VGA_Grn_1 <= '0';
-                    o_VGA_Grn_1 <= '0';
-
-                    o_VGA_Blu_0 <= '0';
-                    o_VGA_Blu_1 <= '0';
-                    o_VGA_Blu_2 <= '0';
+                        o_VGA_Red_0 <= '0';
+                        o_VGA_Red_1 <= '0';
+                        o_VGA_Red_2 <= '0';
+        
+                        o_VGA_Grn_0 <= '0';
+                        o_VGA_Grn_1 <= '0';
+                        o_VGA_Grn_1 <= '0';
+        
+                        o_VGA_Blu_0 <= '0';
+                        o_VGA_Blu_1 <= '0';
+                        o_VGA_Blu_2 <= '0';
                 end if;
-            else
-                o_VGA_Red_0 <= '0';
-                o_VGA_Red_1 <= '0';
-                o_VGA_Red_2 <= '0';
-
-                o_VGA_Grn_0 <= '0';
-                o_VGA_Grn_1 <= '0';
-                o_VGA_Grn_1 <= '0';
-
-                o_VGA_Blu_0 <= '0';
-                o_VGA_Blu_1 <= '0';
-                o_VGA_Blu_2 <= '0';
             end if;
-        end if; 
-    end process process_draw;
+        end if;
+    end process process_write_text;
 end architecture RTL;    

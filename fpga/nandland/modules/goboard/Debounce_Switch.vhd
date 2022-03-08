@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-
+-- debiunce a switch input so its measured reliably
 entity Debounce_switch is 
     port (
         i_Clk : in std_logic;
