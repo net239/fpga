@@ -1,8 +1,10 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.font_en_crt_pkg.all;
 
-entity Uart_Receiver is
+-- send characters from UART to VGA
+entity Uart_To_VGA is
     port (
         -- Main Clock (25 MHz)
         i_Clk         : in std_logic;
@@ -10,7 +12,7 @@ entity Uart_Receiver is
         -- input wire that gives us bits 
         i_UART_RX     : in std_logic;
 
-        -- output wire that gives us bits 
+        -- output wire to echo back what we got
         o_UART_TX     : out std_logic;
 
          -- LED dislay - Segment1 is higher digit, Segment2 is lower digit
@@ -44,11 +46,13 @@ entity Uart_Receiver is
         o_VGA_Blu_1 : out std_logic;
         o_VGA_Blu_2 : out std_logic
     );
-end entity Uart_Receiver;
+end entity Uart_To_VGA;
 
-architecture RTL of Uart_Receiver is
-    signal r_byte_read     : std_logic_vector(7 downto 0);
-    signal r_byte_read_ready : std_logic := '0'; 
+architecture RTL of Uart_To_VGA is
+    signal r_byte_read     : std_logic_vector(7 downto 0);  --byte read from UART
+    signal r_byte_read_ready : std_logic := '0';  -- byte from UART is ready 
+    signal r_byte_display     : std_logic_vector(7 downto 0) := 0;  -- byte to shown on the display
+    
     signal r_Uart_Tx_Active : std_logic := '0'; 
     signal r_UART_TX     : std_logic;
 
@@ -64,11 +68,12 @@ architecture RTL of Uart_Receiver is
     signal r_hPos  : integer range 0 to 800 := 0;
     signal r_vPos  : integer range 0 to 524:= 0;
 
-    signal r_fontRow_Index:  integer;   -- row index of single pixel line in complete font set
-    signal r_fontPixels_row: std_logic_vector(font_en_crt_pkg.FONT_WIDTH-1 downto 0);  -- single pixel line at the above index
+    signal r_fontRow_Index:  integer := 0;   -- row index of one single line of pixels in complete font set
+    signal r_fontPixels_row: std_logic_vector(work.font_en_crt_pkg.FONT_WIDTH-1 downto 0);  --  one single line of pixels in complete font set -  at the above index
+    signal r_fontRow_Current_Pixel : std_logic := '0';    -- current pixel from the font row, select based on hPos in video display
 
-    signal r_hTextPos : integer := 100;  -- horizental and vertical text poistion on display
-    signal r_vTextPos : integer := 100;
+    signal r_hTextPos : integer := 200;  -- horizental and vertical text poistion on display
+    signal r_vTextPos : integer := 200;
 
     
   begin
@@ -134,7 +139,6 @@ architecture RTL of Uart_Receiver is
         o_Segment_G  => w_Segment2_G
     );
 
-    
 
     --font for VGA driver
     Font_en_Inst : entity work.Font_en_crt
@@ -166,6 +170,7 @@ architecture RTL of Uart_Receiver is
     -- send output only when UART TX is active
     o_UART_TX <= r_UART_TX   when r_Uart_Tx_Active = '1'  else '1';
 
+    -- simple function to display square grid on VGA - for testing purposes
     -- process_draw : process (i_Clk)
     -- begin
     --     if rising_edge(i_Clk) then
@@ -211,33 +216,61 @@ architecture RTL of Uart_Receiver is
     --     end if; 
     -- end process process_draw;
 
-    process_fontPixelRow : process (i_Clk)
+    -- fetch the byte to be displayed     
+    process_updateByteToDisplay : process (i_Clk)
     begin
         if rising_edge(i_Clk) then
-            r_fontRow_Index <=  to_integer(unsigned(r_byte_read)) + (r_vPos - r_vTextPos);
+          if r_byte_read_ready = '1' then
+                r_byte_display <= r_byte_read;
+          end if;
         end if;
-    end process process_fontPixelRow;
+    end process process_updateByteToDisplay;
+
+    -- update start of font row index
+    process_updateFontRowStartIndex : process (i_Clk)
+    begin
+        if rising_edge(i_Clk) then
+          if r_vPos >= r_vTextPos - 1  and r_vPos < r_vTextPos + work.font_en_crt_pkg.FONT_HEIGHT -1  then
+                r_fontRow_Index <=  to_integer((unsigned(r_byte_display)) * work.font_en_crt_pkg.FONT_HEIGHT )+ (r_vPos - r_vTextPos + 1);
+          else
+                r_fontRow_Index <= 0;
+          end if;
+        end if;
+    end process process_updateFontRowStartIndex;
+    
+    -- update current pixel value
+    process_updateFontRowCurrentPixel : process (i_Clk)
+    begin
+        if rising_edge(i_Clk) then
+          if r_hPos >= r_hTextPos - 1  and r_hPos < r_hTextPos + work.font_en_crt_pkg.FONT_WIDTH -1 then
+                -- NOTE we subtract from  work.font_en_crt_pkg.FONT_WIDTH -1 becuase the r_fontPixels_row goes from WIDTH downto 0, we need to flip it
+            	r_fontRow_Current_Pixel <=  r_fontPixels_row( work.font_en_crt_pkg.FONT_WIDTH - 1 - (r_hPos - r_hTextPos + 1));
+           else 
+                r_fontRow_Current_Pixel <= '0';    
+           end if;
+        end if;
+    end process process_updateFontRowCurrentPixel;
 
     process_write_text : process (i_Clk)
     begin
         if rising_edge(i_Clk) then
             if r_isVideoOn = '1' then
                 --check if current pixel position is inside the text area
-                if r_hPos >= r_hTextPos and r_hPos < r_hTextPos + font_en_crt_pkg.FONT_WIDTH and
-                    r_vPos >= r_vTextPos and r_vPos < r_vTextPos + font_en_crt_pkg.FONT_HEIGHT then
+                if r_hPos >= r_hTextPos and r_hPos < r_hTextPos + work.font_en_crt_pkg.FONT_WIDTH and
+                    r_vPos >= r_vTextPos and r_vPos < r_vTextPos + work.font_en_crt_pkg.FONT_HEIGHT then
 
-                        if r_fontPixels_row(r_fontRow_Index + (r_hPos - r_hTextPos)) = '1' then 
+                        if r_fontRow_Current_Pixel = '1' then 
                             o_VGA_Red_0 <= '1';
                             o_VGA_Red_1 <= '1';
                             o_VGA_Red_2 <= '1';
 
-                            o_VGA_Grn_0 <= '0';
-                            o_VGA_Grn_1 <= '0';
-                            o_VGA_Grn_1 <= '0';
+                            o_VGA_Grn_0 <= '1';
+                            o_VGA_Grn_1 <= '1';
+                            o_VGA_Grn_1 <= '1';
             
-                            o_VGA_Blu_0 <= '0';
-                            o_VGA_Blu_1 <= '0';
-                            o_VGA_Blu_2 <= '0';
+                            o_VGA_Blu_0 <= '1';
+                            o_VGA_Blu_1 <= '1';
+                            o_VGA_Blu_2 <= '1';
                         else
                             o_VGA_Red_0 <= '0' ;
                             o_VGA_Red_1 <= '0';
@@ -247,9 +280,9 @@ architecture RTL of Uart_Receiver is
                             o_VGA_Grn_1 <= '0';
                             o_VGA_Grn_1 <= '0';
             
-                            o_VGA_Blu_0 <= '1';
-                            o_VGA_Blu_1 <= '1';
-                            o_VGA_Blu_2 <= '1';
+                            o_VGA_Blu_0 <= '0';
+                            o_VGA_Blu_1 <= '0';
+                            o_VGA_Blu_2 <= '0';
                         end if;
 
                         

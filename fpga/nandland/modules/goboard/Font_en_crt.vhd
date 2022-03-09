@@ -17,8 +17,8 @@ use work.font_en_crt_pkg.all;
 entity Font_en_crt is
 	port(
 		i_Clk: in std_logic;
-		i_fontRow_Index: in integer;   -- row index of single pixel line in complete font set
-		o_fontPixels_row: out std_logic_vector(work.font_en_crt_pkg.FONT_WIDTH-1 downto 0)  -- single pixel line at the above index
+		i_fontRow_Index: in integer;   -- row index of one single line of pixels in complete font set
+		o_fontPixels_row: out std_logic_vector(work.font_en_crt_pkg.FONT_WIDTH-1 downto 0)  -- single line of pixels at the above index
 	);
 end Font_en_crt;
 

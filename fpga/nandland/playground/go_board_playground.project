@@ -4,7 +4,7 @@ Version=Lattice Semiconductor Corporation iCEcube - Release: 2020.12.27943 - Bui
 ProjectName=go_board_playground
 Vendor=SiliconBlue
 Synthesis=synplify
-ProjectVFiles=../modules/goboard/Binary_To_7Segment.vhd=work,../modules/goboard/Debounce_Switch.vhd=work,../modules/goboard/Uart_Rx.vhd=work,Uart_Interface/Uart_Receiver.vhd=work,../modules/goboard/Uart_Tx.vhd=work,../modules/goboard/Vga_driver.vhd=work,../modules/goboard/Font_en_crt.vhd=work,../modules/goboard/Font_en_crt_pkg.vhd
+ProjectVFiles=../modules/goboard/Binary_To_7Segment.vhd=work,../modules/goboard/Debounce_Switch.vhd=work,../modules/goboard/Uart_Rx.vhd=work,../modules/goboard/Uart_Tx.vhd=work,../modules/goboard/Vga_driver.vhd=work,../modules/goboard/Font_en_crt.vhd=work,../modules/goboard/Font_en_crt_pkg.vhd=work,Uart_To_VGA/Uart_To_VGA.vhd
 ProjectCFiles=../modules/goboard/Go_Board_Clock_Constraint.sdc
 CurImplementation=go_board_playground_Implmnt
 Implementations=go_board_playground_Implmnt
@@ -19,9 +19,9 @@ DevicePower=
 NetlistFile=go_board_playground_Implmnt/go_board_playground.edf
 AdditionalEDIFFile=
 IPEDIFFile=
-DesignLib=go_board_playground_Implmnt/sbt/netlist/oadb-Uart_Receiver
+DesignLib=go_board_playground_Implmnt/sbt/netlist/oadb-Uart_To_VGA
 DesignView=_rt
-DesignCell=Uart_Receiver
+DesignCell=Uart_To_VGA
 SynthesisSDCFile=go_board_playground_Implmnt/go_board_playground.scf
 UserPinConstraintFile=
 UserSDCFile=

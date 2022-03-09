@@ -5,11 +5,11 @@
 add_file -vhdl -lib work "../modules/goboard/Binary_To_7Segment.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Debounce_Switch.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Uart_Rx.vhd" 
-add_file -vhdl -lib work "Uart_Interface/Uart_Receiver.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Uart_Tx.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Vga_driver.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Font_en_crt.vhd" 
 add_file -vhdl -lib work "../modules/goboard/Font_en_crt_pkg.vhd" 
+add_file -vhdl -lib work "Uart_To_VGA/Uart_To_VGA.vhd" 
 add_file -constraint -lib work "../modules/goboard/Go_Board_Clock_Constraint.sdc"
 #implementation: "go_board_playground_Implmnt"
 impl -add go_board_playground_Implmnt -type fpga

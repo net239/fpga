@@ -2,6 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- UART receiver 
 entity Uart_Rx is
     generic (
         -- Clocks per bit
