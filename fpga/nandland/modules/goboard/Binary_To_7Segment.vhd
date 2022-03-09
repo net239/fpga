@@ -59,6 +59,8 @@ begin
                     r_Hex_Encoding <= X"4F";
                 when "1111" =>
                     r_Hex_Encoding <= X"47";
+                when others =>
+                    r_Hex_Encoding <= X"00"; 
             end case;
         end if;
   end process;
