@@ -6,17 +6,11 @@
 -- from https://github.com/Derek-X-Wang/VGA-Text-Generator/blob/master/VGA-Text-Generator.srcs/sources_1/new/Font_Rom.vhd
 -- 
 
-package font_en_crt is 
-	constant FONT_WIDTH : integer := 8;
-	constant FONT_HEIGHT : integer := 16;
-end package font_en_crt;
-
-package body font_en_crt is 
-end package body font_en_crt;
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.font_en_crt_pkg.all;
 
 
 -- defines 8x10 english font bitmap
@@ -24,7 +18,7 @@ entity Font_en_crt is
 	port(
 		i_Clk: in std_logic;
 		i_fontRow_Index: in integer;   -- row index of single pixel line in complete font set
-		o_fontPixels_row: out std_logic_vector(font_en_crt.FONT_WIDTH-1 downto 0)  -- single pixel line at the above index
+		o_fontPixels_row: out std_logic_vector(work.font_en_crt_pkg.FONT_WIDTH-1 downto 0)  -- single pixel line at the above index
 	);
 end Font_en_crt;
 
@@ -34,7 +28,7 @@ architecture RTL of Font_en_crt is
 	-- 2^7 charactors
 	-- + 2^4 row per charactor 
 	-- therefore the total array size is 2^11 = 2048
-	type rom_type is array (0 to 2**11-1) of std_logic_vector(font_en_crt.FONT_WIDTH-1 downto 0);
+	type rom_type is array (0 to 2**11-1) of std_logic_vector(work.font_en_crt_pkg.FONT_WIDTH-1 downto 0);
 
 	-- ROM definition
 	signal ROM: rom_type := (   -- 2^11-by-8

@@ -65,7 +65,7 @@ architecture RTL of Uart_Receiver is
     signal r_vPos  : integer range 0 to 524:= 0;
 
     signal r_fontRow_Index:  integer;   -- row index of single pixel line in complete font set
-    signal r_fontPixels_row: std_logic_vector(font_en_crt.FONT_WIDTH-1 downto 0);  -- single pixel line at the above index
+    signal r_fontPixels_row: std_logic_vector(font_en_crt_pkg.FONT_WIDTH-1 downto 0);  -- single pixel line at the above index
 
     signal r_hTextPos : integer := 100;  -- horizental and vertical text poistion on display
     signal r_vTextPos : integer := 100;
@@ -223,10 +223,10 @@ architecture RTL of Uart_Receiver is
         if rising_edge(i_Clk) then
             if r_isVideoOn = '1' then
                 --check if current pixel position is inside the text area
-                if r_hPos >= r_hTextPos and r_hPos < r_hTextPos + font_en_crt.FONT_WIDTH and
-                    r_vPos >= r_vTextPos and r_vPos < r_vTextPos + font_en_crt.FONT_HEIGHT then
+                if r_hPos >= r_hTextPos and r_hPos < r_hTextPos + font_en_crt_pkg.FONT_WIDTH and
+                    r_vPos >= r_vTextPos and r_vPos < r_vTextPos + font_en_crt_pkg.FONT_HEIGHT then
 
-                        if r_fontPixels_row(r_hPos - r_hTextPos) = '1' then 
+                        if r_fontPixels_row(r_fontRow_Index + (r_hPos - r_hTextPos)) = '1' then 
                             o_VGA_Red_0 <= '1';
                             o_VGA_Red_1 <= '1';
                             o_VGA_Red_2 <= '1';
