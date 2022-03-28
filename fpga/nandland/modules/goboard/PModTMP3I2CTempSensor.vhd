@@ -19,7 +19,7 @@ entity PModTMP3I2CTempSensor is
         g_CLKS_PER_BIT : integer := 250            -- Clock speed divided by baud rate  - 25,000,000 / 100,000
     );
     port (
-        -- Main Clock - 
+        -- Main Clock - 25Mhz
         -- I2C standard speed is 100kbps, Fast Mode is 400Kbps and High Speed mode is 3.4Mbps
         i_Clk         : in std_logic;
 
@@ -113,7 +113,7 @@ begin
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
                         r_Clk_Count <= r_Clk_Count + 1;    
                         
-                        -- lets bring down clock so we can start changing data
+                        -- lets bring down clock so we can start getting data
                         w_SCL <= '0';
                         
                         --lets pull back so slave can send us ACK
@@ -170,7 +170,9 @@ begin
                     elsif r_Clk_Count = ( g_CLKS_PER_BIT-1)  then
                         r_Clk_Count <= 0;
 
+                        -- send ACk
                         W_SDA <= '0';
+                        r_I2CReadingStateMachine <= state_DataFromSlaveLSB;  
 
                         -- clock UP to indicate data is stable
                         w_SCL <= '1'; 
@@ -213,7 +215,9 @@ begin
                     elsif r_Clk_Count = ( g_CLKS_PER_BIT-1)  then
                         r_Clk_Count <= 0;
 
+                        --send ACk
                         W_SDA <= '0';
+                        r_I2CReadingStateMachine <= state_PrepareStart;  
                                             
                         -- clock UP to indicate data is stable
                         w_SCL <= '1'; 
