@@ -23,10 +23,12 @@ entity PModTMP3I2CTempSensor is
         -- I2C standard speed is 100kbps, Fast Mode is 400Kbps and High Speed mode is 3.4Mbps
         i_Clk         : in std_logic;
 
-        -- output temprature reading in Celcius - MSP and LCB bytes
+        -- output temprature reading in Celcius - MSB and LSB bytes
         o_TempInCelciusMSB   : out std_logic_vector(7 downto 0);
         o_TempInCelciusLSB   : out std_logic_vector(7 downto 0);
         o_TempReading_Ready  : out std_logic;
+        o_GotAckFromSensor   : out std_logic;
+        o_IC2BusOk           : out std_logic;
 
         io_SCL : inout std_logic ; -- SERIAL CLOCK - SCL
         io_SDA : inout std_logic  -- SERIAl DATA - SDA
@@ -42,12 +44,15 @@ architecture RTL of PModTMP3I2CTempSensor is
     signal r_I2CReadingStateMachine : I2CReadingStateMachine := state_PrepareStart;
     signal r_Clk_Count   : integer range 0 to g_CLKS_PER_BIT-1 := 0;
 
-    signal r_AddrBit_Count   : integer range 0 to 7 := 0;
-    signal r_Addr : std_logic_vector(6 downto 0);
+    signal r_AddrBit_Count   : integer range 0 to 6 := 0;
+    signal r_Addr : std_logic_vector(6 downto 0);  
     signal r_DataFromSlaveBit_Count   : integer range 0 to 7 := 0;
+    signal r_TempReading_Ready : std_logic := '0';
     
 begin
-	r_Addr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,7));
+    r_Addr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_Addr'length));
+    o_TempReading_Ready <= r_TempReading_Ready;
+
     
     -- Purpose: Control RX state machine
     process_I2C_RX : process (i_Clk)
@@ -55,19 +60,28 @@ begin
         if rising_edge(i_Clk) then
             case r_I2CReadingStateMachine is
                 when state_PrepareStart =>
-                    -- lets first set SCL High and SDA High
-                    -- TODO - This should be changed for multiple master setup
+                    -- lets first set SCL High and SDA High - We will later check if it remains high to make sure no one else is pulling it down
                     io_SCL <= '1'; 
                     io_SDA <= '1';
                     r_Clk_Count <= 0;
+                    o_GotAckFromSensor <= '0';
+                    o_IC2BusOk <= '0';
                     r_I2CReadingStateMachine <= state_Start;
                 when state_Start =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then
                         r_Clk_Count <= 0;
 
                         --lets now set SDA Low ( While SCL is high) - this is the START condition
-                        io_SDA <= '0';
-                        r_I2CReadingStateMachine <= state_Address;
+                        if io_SCL = '0' or io_SDA = '0' then
+                            -- lets make sure no one else has pulled the lines low
+                            -- looks like the bus is busy, lets try after some time
+                            r_I2CReadingStateMachine <= state_PrepareStart;
+                        else
+                            --all good, lets send START condition
+                            o_IC2BusOk <= '1';
+                            io_SDA <= '0';
+                            r_I2CReadingStateMachine <= state_Address;
+                        end if;
                     else
                         r_Clk_Count <= r_Clk_Count + 1;
                     end if;
@@ -80,9 +94,10 @@ begin
                     elsif r_Clk_Count = ( g_CLKS_PER_BIT-1)  then
                         r_Clk_Count <= 0;
 
-                        if r_AddrBit_Count < 7 then
-                            --send address bits
-                            io_SDA <= r_Addr(r_AddrBit_Count);
+                        --send address bits
+                        io_SDA <= r_Addr(r_Addr'length - 1 - r_AddrBit_Count); --I2C expects MSB first
+
+                        if r_AddrBit_Count < 6 then
                             r_AddrBit_Count <= r_AddrBit_Count + 1;
                         else
                             r_AddrBit_Count  <= 0;
@@ -116,7 +131,7 @@ begin
                         r_Clk_Count <= r_Clk_Count + 1;    
                         
                         -- lets bring down clock so we can start getting data
-                        io_SCL <= '0';
+                        io_SCL <= '0'; 
                         
                         --lets pull back so slave can send us ACK
                         io_SDA <= '1';
@@ -126,6 +141,7 @@ begin
                         r_Clk_Count <= 0;
 
                         if io_SDA = '0' then
+                            o_GotAckFromSensor <= '1' ; -- just signal we got Ack from slave, just for debugging purpose
                             r_I2CReadingStateMachine <= state_DataFromSlaveMSB;        
                         else
                             r_I2CReadingStateMachine <= state_PrepareStart;        -- restarting since we did not get ack
@@ -223,6 +239,10 @@ begin
                                             
                         -- clock UP to indicate data is stable
                         io_SCL <= '1'; 
+
+                        --indicate we are done reading both bytes
+                        r_TempReading_Ready <= '1';
+
                     else
                         r_Clk_Count <= r_Clk_Count + 1;
                     end if;                                      

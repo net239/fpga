@@ -27,7 +27,13 @@ entity DisplayTempOnSevenSegment is
 
         -- PMOD based temp sensor
         io_PMOD_3 : inout std_logic ; -- SERIAL CLOCK - SCL
-        io_PMOD_4 : inout std_logic  -- SERIAl DATA - SDA
+        io_PMOD_4 : inout std_logic;  -- SERIAl DATA - SDA
+
+        --debugging
+        o_LED_1 : out std_logic;
+        o_LED_2 : out std_logic;
+        o_LED_3 : out std_logic;
+        o_LED_4 : out std_logic
     );
 end entity DisplayTempOnSevenSegment;
 
@@ -36,6 +42,8 @@ architecture RTL of DisplayTempOnSevenSegment is
     signal r_TempInCelciusLSB     : std_logic_vector(7 downto 0);  --byte read from Temp sensor
     signal r_TempInCelciusToDisplay : std_logic_vector(7 downto 0) := 0;
     signal r_TempReading_Ready    : std_logic := '0';  -- reading from Temp sensor is ready 
+    signal r_GotAckFromSensor    : std_logic := '0';  -- Got some Ack from sensor - just for debuging
+    signal r_IC2BusOk    : std_logic := '0';
 
     signal w_Segment1_A, w_Segment2_A : std_logic;
     signal w_Segment1_B, w_Segment2_B : std_logic;
@@ -79,6 +87,8 @@ begin
             o_TempInCelciusMSB   => r_TempInCelciusMSB,
             o_TempInCelciusLSB   => r_TempInCelciusLSB,
             o_TempReading_Ready  => r_TempReading_Ready,
+            o_GotAckFromSensor   => r_GotAckFromSensor,
+            o_IC2BusOk           => r_IC2BusOk,
             io_SCL => io_PMOD_3,
             io_SDA => io_PMOD_4
     );
@@ -110,5 +120,11 @@ begin
     o_Segment1_E <= not w_Segment1_E;
     o_Segment1_F <= not w_Segment1_F;
     o_Segment1_G <= not w_Segment1_G;
+
+    --debugging
+    o_LED_1 <= r_TempReading_Ready;
+    o_LED_2 <= r_GotAckFromSensor;
+    o_LED_3 <= r_IC2BusOk;
+    
 
 end architecture RTL;
