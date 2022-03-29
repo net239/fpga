@@ -3,6 +3,8 @@
 #project files
 
 add_file -vhdl -lib work "../../modules/goboard/PModTMP3I2CTempSensor.vhd" 
+add_file -vhdl -lib work "DisplayTempOnSevenSegment.vhd" 
+add_file -vhdl -lib work "../../modules/goboard/Binary_To_7Segment.vhd" 
 add_file -constraint -lib work "../../modules/goboard/Go_Board_Clock_Constraint.sdc"
 #implementation: "pmodi2ctempsensor_Implmnt"
 impl -add pmodi2ctempsensor_Implmnt -type fpga
