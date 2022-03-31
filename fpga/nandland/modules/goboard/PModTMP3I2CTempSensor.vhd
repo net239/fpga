@@ -10,7 +10,7 @@ use ieee.numeric_std.all;
 -- refer for temp sensor details - https://ww1.microchip.com/downloads/en/DeviceDoc/21935D.pdf
 -- refer Quick Start operation : https://digilent.com/reference/_media/reference/pmod/pmodtmp3/pmodtmp3_rm.pdf
 -- refer more i2c - https://www.ti.com/lit/an/slva704/slva704.pdf
--- NOTE This design is a single Master implementation - it assumes that there is only one master on the IC2 bus
+-- refer https://interrupt.memfault.com/blog/i2c-in-a-nutshell
 entity PModTMP3I2CTempSensor is
     generic (
         I2C_DEVICE_ADDRESS: integer := 16#48# ; -- hexadeciaml 0x48 - if JP1/JP2/JP3 all are set to GND the address for this PMOD sensor is 0x48. 7 BIT address
@@ -27,8 +27,8 @@ entity PModTMP3I2CTempSensor is
         o_TempInCelciusMSB   : out std_logic_vector(7 downto 0);
         o_TempInCelciusLSB   : out std_logic_vector(7 downto 0);
         o_TempReading_Ready  : out std_logic;
-        o_GotAckFromSensor   : out std_logic;
-        o_IC2BusOk           : out std_logic;
+
+        o_StateAsNumber             : out  integer range 0 to 32; --for debugging      
 
         io_SCL : inout std_logic ; -- SERIAL CLOCK - SCL
         io_SDA : inout std_logic  -- SERIAl DATA - SDA
@@ -42,16 +42,19 @@ architecture RTL of PModTMP3I2CTempSensor is
                 state_PrepareStart, state_Start, state_Address, state_ReadWriteBit, state_AckFromSlave, state_DataFromSlaveMSB,state_DataFromSlaveMSBAck,state_DataFromSlaveLSB,state_DataFromSlaveLSBAck
             );
     signal r_I2CReadingStateMachine : I2CReadingStateMachine := state_PrepareStart;
+    signal r_StateAsNumber : integer range 0 to 32 := 0; --for debugging
     signal r_Clk_Count   : integer range 0 to g_CLKS_PER_BIT-1 := 0;
 
     signal r_AddrBit_Count   : integer range 0 to 6 := 0;
-    signal r_Addr : std_logic_vector(6 downto 0);  
+    signal r_Addr : std_logic_vector(0 to 6);  --I2C expects MSB first
     signal r_DataFromSlaveBit_Count   : integer range 0 to 7 := 0;
     signal r_TempReading_Ready : std_logic := '0';
     
 begin
     r_Addr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_Addr'length));
     o_TempReading_Ready <= r_TempReading_Ready;
+    r_StateAsNumber <= I2CReadingStateMachine'POS(r_I2CReadingStateMachine) ; 
+    o_StateAsNumber <= r_StateAsNumber;
 
     
     -- Purpose: Control RX state machine
@@ -64,8 +67,6 @@ begin
                     io_SCL <= '1'; 
                     io_SDA <= '1';
                     r_Clk_Count <= 0;
-                    o_GotAckFromSensor <= '0';
-                    o_IC2BusOk <= '0';
                     r_I2CReadingStateMachine <= state_Start;
                 when state_Start =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then
@@ -78,7 +79,6 @@ begin
                             r_I2CReadingStateMachine <= state_PrepareStart;
                         else
                             --all good, lets send START condition
-                            o_IC2BusOk <= '1';
                             io_SDA <= '0';
                             r_I2CReadingStateMachine <= state_Address;
                         end if;
@@ -95,7 +95,7 @@ begin
                         r_Clk_Count <= 0;
 
                         --send address bits
-                        io_SDA <= r_Addr(r_Addr'length - 1 - r_AddrBit_Count); --I2C expects MSB first
+                        io_SDA <= r_Addr(r_AddrBit_Count); --I2C expects MSB first
 
                         if r_AddrBit_Count < 6 then
                             r_AddrBit_Count <= r_AddrBit_Count + 1;
@@ -141,7 +141,6 @@ begin
                         r_Clk_Count <= 0;
 
                         if io_SDA = '0' then
-                            o_GotAckFromSensor <= '1' ; -- just signal we got Ack from slave, just for debugging purpose
                             r_I2CReadingStateMachine <= state_DataFromSlaveMSB;        
                         else
                             r_I2CReadingStateMachine <= state_PrepareStart;        -- restarting since we did not get ack
@@ -153,6 +152,8 @@ begin
                         r_Clk_Count <= r_Clk_Count + 1;
                     end if;       
                 when state_DataFromSlaveMSB =>
+                    r_TempReading_Ready <= '0'; -- mark this as we are now reading the data
+
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
                         r_Clk_Count <= r_Clk_Count + 1;    
                         

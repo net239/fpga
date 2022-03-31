@@ -29,11 +29,15 @@ entity DisplayTempOnSevenSegment is
         io_PMOD_3 : inout std_logic ; -- SERIAL CLOCK - SCL
         io_PMOD_4 : inout std_logic;  -- SERIAl DATA - SDA
 
+        io_PMOD_9 : inout std_logic ; -- SERIAL CLOCK - SCL
+        io_PMOD_10 : inout std_logic;  -- SERIAl DATA - SDA
+
+
         --debugging
-        o_LED_1 : out std_logic;
-        o_LED_2 : out std_logic;
-        o_LED_3 : out std_logic;
-        o_LED_4 : out std_logic
+        o_LED_1 : inout std_logic;
+        o_LED_2 : inout std_logic;
+        o_LED_3 : inout std_logic;
+        o_LED_4 : inout std_logic
     );
 end entity DisplayTempOnSevenSegment;
 
@@ -44,6 +48,10 @@ architecture RTL of DisplayTempOnSevenSegment is
     signal r_TempReading_Ready    : std_logic := '0';  -- reading from Temp sensor is ready 
     signal r_GotAckFromSensor    : std_logic := '0';  -- Got some Ack from sensor - just for debuging
     signal r_IC2BusOk    : std_logic := '0';
+    signal r_StateAsNumber : integer range 0 to 32 := 0; --for debugging
+
+    signal r_ClockCounter :  integer := 0; -- to generate a slow clock
+    signal i_SlowClock    : std_logic := '0';
 
     signal w_Segment1_A, w_Segment2_A : std_logic;
     signal w_Segment1_B, w_Segment2_B : std_logic;
@@ -82,23 +90,45 @@ begin
     
     --Instantiate module to get temprature readings
     PModTMP3I2CTempSensor_Inst : entity work.PModTMP3I2CTempSensor
+        generic map (
+            g_CLKS_PER_BIT => 5
+        )
         port map (
-            i_Clk        => i_Clk,
+            i_Clk        => i_SlowClock,
             o_TempInCelciusMSB   => r_TempInCelciusMSB,
             o_TempInCelciusLSB   => r_TempInCelciusLSB,
             o_TempReading_Ready  => r_TempReading_Ready,
-            o_GotAckFromSensor   => r_GotAckFromSensor,
-            o_IC2BusOk           => r_IC2BusOk,
+            o_StateAsNumber  => r_StateAsNumber,
             io_SCL => io_PMOD_3,
             io_SDA => io_PMOD_4
     );
 
+    --slow down clock
+    process_slowClock  : process (i_Clk)
+    begin
+        if rising_edge(i_Clk) then
+            if r_ClockCounter = 25000000 then
+                i_SlowClock <= '1';
+                r_ClockCounter <= 0;
+            else
+                r_ClockCounter <= r_ClockCounter  + 1;
+                i_SlowClock <= '0';
+            end if;
+        end if;
+    end process process_slowClock;
+
      -- fetch the temp to be displayed     
-     process_updateTempToDisplay : process (i_Clk)
+     process_updateTempToDisplay : process (i_SlowClock)
      begin
-         if rising_edge(i_Clk) then
+         if rising_edge(i_SlowClock) then
            if r_TempReading_Ready = '1' then
-                r_TempInCelciusToDisplay <= r_TempInCelciusMSB;
+                --r_TempInCelciusToDisplay <= 2;
+                o_LED_2 <= '0';
+                o_LED_1 <= '0';
+            else
+                --r_TempInCelciusToDisplay <= 1;
+                o_LED_2 <= '1';
+                o_LED_1 <= '1';
            end if;
          end if;
      end process process_updateTempToDisplay;
@@ -121,10 +151,14 @@ begin
     o_Segment1_F <= not w_Segment1_F;
     o_Segment1_G <= not w_Segment1_G;
 
-    --debugging
-    o_LED_1 <= r_TempReading_Ready;
-    o_LED_2 <= r_GotAckFromSensor;
-    o_LED_3 <= r_IC2BusOk;
-    
+    r_TempInCelciusToDisplay <= std_logic_vector(to_unsigned(r_StateAsNumber,r_TempInCelciusToDisplay'length));
+
+    io_PMOD_9 <= io_PMOD_3;
+    io_PMOD_10 <= io_PMOD_4;
+
+    o_LED_3 <= io_PMOD_3;
+    o_LED_4 <= io_PMOD_4;
+
+
 
 end architecture RTL;

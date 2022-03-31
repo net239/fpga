@@ -4,7 +4,7 @@ Version=Lattice Semiconductor Corporation iCEcube - Release: 2020.12.27943 - Bui
 ProjectName=pmodi2ctempsensor
 Vendor=SiliconBlue
 Synthesis=synplify
-ProjectVFiles=../../modules/goboard/PModTMP3I2CTempSensor.vhd=work,DisplayTempOnSevenSegment.vhd,../../modules/goboard/Binary_To_7Segment.vhd
+ProjectVFiles=../../modules/goboard/PModTMP3I2CTempSensor.vhd=work,DisplayTempOnSevenSegment.vhd=work,../../modules/goboard/Binary_To_7Segment.vhd=work
 ProjectCFiles=../../modules/goboard/Go_Board_Clock_Constraint.sdc
 CurImplementation=pmodi2ctempsensor_Implmnt
 Implementations=pmodi2ctempsensor_Implmnt
