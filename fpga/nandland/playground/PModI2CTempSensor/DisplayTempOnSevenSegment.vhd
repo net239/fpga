@@ -46,11 +46,9 @@ architecture RTL of DisplayTempOnSevenSegment is
     signal r_TempInCelciusLSB     : std_logic_vector(7 downto 0);  --byte read from Temp sensor
     signal r_TempInCelciusToDisplay : std_logic_vector(7 downto 0) := 0;
     signal r_TempReading_Ready    : std_logic := '0';  -- reading from Temp sensor is ready 
-    signal r_GotAckFromSensor    : std_logic := '0';  -- Got some Ack from sensor - just for debuging
-    signal r_IC2BusOk    : std_logic := '0';
     signal r_StateAsNumber : integer range 0 to 32 := 0; --for debugging
 
-    signal r_ClockCounter :  integer := 0; -- to generate a slow clock
+    signal r_Clk_Count :  integer := 0; -- to generate a slow clock
     signal i_SlowClock    : std_logic := '0';
 
     signal w_Segment1_A, w_Segment2_A : std_logic;
@@ -60,6 +58,10 @@ architecture RTL of DisplayTempOnSevenSegment is
     signal w_Segment1_E, w_Segment2_E : std_logic;
     signal w_Segment1_F, w_Segment2_F : std_logic;
     signal w_Segment1_G, w_Segment2_G : std_logic;
+
+    signal r_SCL : std_logic := '0';
+    signal r_SDA : std_logic := '0';
+    signal r_SDA_Last : std_logic := '0';
 begin
     -- Instantiate Binary to 7-Segment Converter
     SevenSeg1_Inst : entity work.Binary_To_7Segment
@@ -91,7 +93,7 @@ begin
     --Instantiate module to get temprature readings
     PModTMP3I2CTempSensor_Inst : entity work.PModTMP3I2CTempSensor
         generic map (
-            g_CLKS_PER_BIT => 5
+            g_CLKS_PER_BIT => 10
         )
         port map (
             i_Clk        => i_SlowClock,
@@ -99,39 +101,61 @@ begin
             o_TempInCelciusLSB   => r_TempInCelciusLSB,
             o_TempReading_Ready  => r_TempReading_Ready,
             o_StateAsNumber  => r_StateAsNumber,
-            io_SCL => io_PMOD_3,
-            io_SDA => io_PMOD_4
+            io_SCL => r_SCL,
+            io_SDA => r_SDA
     );
 
     --slow down clock
     process_slowClock  : process (i_Clk)
     begin
         if rising_edge(i_Clk) then
-            if r_ClockCounter = 25000000 then
-                i_SlowClock <= '1';
-                r_ClockCounter <= 0;
+            if r_Clk_Count = 0  then
+                if i_SlowClock = '1'  then
+                    i_SlowClock <= '0';
+                else
+                    i_SlowClock <= '1';
+                end if;
+
+                r_Clk_Count <= r_Clk_Count + 1;
+            elsif  r_Clk_Count = (25000000/5 - 1) then
+                r_Clk_Count <= 0;
             else
-                r_ClockCounter <= r_ClockCounter  + 1;
-                i_SlowClock <= '0';
+                r_Clk_Count <= r_Clk_Count + 1;
             end if;
         end if;
     end process process_slowClock;
 
      -- fetch the temp to be displayed     
-     process_updateTempToDisplay : process (i_SlowClock)
+     process_updateTempToDisplay : process (i_Clk)
      begin
-         if rising_edge(i_SlowClock) then
+         if rising_edge(i_Clk) then
            if r_TempReading_Ready = '1' then
                 --r_TempInCelciusToDisplay <= 2;
-                o_LED_2 <= '0';
-                o_LED_1 <= '0';
+                o_LED_4 <= '1';
             else
                 --r_TempInCelciusToDisplay <= 1;
-                o_LED_2 <= '1';
-                o_LED_1 <= '1';
+                o_LED_4 <= '0';
            end if;
          end if;
      end process process_updateTempToDisplay;
+
+    -- observe I2C Start
+    process_ObserveI2CStart  : process (r_SDA)
+    begin
+        if falling_edge(r_SDA) then
+            --check for Start condition
+            if r_SCL = '1' then -- SCL is up
+                o_LED_2 <= '1';
+            else
+                o_LED_2 <= '0';
+            end if;
+        end if;
+    end process process_ObserveI2CStart;
+
+  
+    --observe I2C Clock
+    o_LED_1 <= r_SCL;
+    o_LED_3 <= r_SDA;
 
     -- these are all NOT becuase Go board makes LED light up when its low
     o_Segment2_A <= not w_Segment2_A;
@@ -153,12 +177,11 @@ begin
 
     r_TempInCelciusToDisplay <= std_logic_vector(to_unsigned(r_StateAsNumber,r_TempInCelciusToDisplay'length));
 
-    io_PMOD_9 <= io_PMOD_3;
-    io_PMOD_10 <= io_PMOD_4;
+    io_PMOD_3 <= r_SCL;
+    io_PMOD_4 <= r_SDA;
 
-    o_LED_3 <= io_PMOD_3;
-    o_LED_4 <= io_PMOD_4;
+    io_PMOD_9 <= r_SCL;
+    io_PMOD_10 <= r_SDA;
 
-
-
+    
 end architecture RTL;
