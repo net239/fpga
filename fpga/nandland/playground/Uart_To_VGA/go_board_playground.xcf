@@ -17,9 +17,9 @@
 				<BScanLen>1</BScanLen>
 				<BScanVal>0</BScanVal>
 			</Bypass>
-			<File>D:/jsahni/projects/fpga/nandland/playground/Uart_To_VGA/go_board_playground_Implmnt/sbt/outputs/bitmap/Uart_To_VGA_bitmap.bin</File>
-			<FileTime>03/27/22 22:15:26</FileTime>
-			<JedecChecksum>0xFCD5</JedecChecksum>
+			<File>D:/jsahni/projects/fpga/nandland/playground/PModI2CTempSensor/pmodi2ctempsensor_Implmnt/sbt/outputs/bitmap/DisplayTempOnSevenSegment_bitmap.bin</File>
+			<FileTime>04/09/22 15:16:15</FileTime>
+			<JedecChecksum>0x05D6</JedecChecksum>
 			<Operation>SPI Flash Erase,Program,Verify</Operation>
 			<Option>
 				<SVFVendor>JTAG STANDARD</SVFVendor>

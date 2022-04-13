@@ -26,18 +26,14 @@ entity DisplayTempOnSevenSegment is
         o_Segment2_G  : out std_logic;
 
         -- PMOD based temp sensor
-        io_PMOD_3 : inout std_logic ; -- SERIAL CLOCK - SCL
+        io_PMOD_3 : out std_logic ; -- SERIAL CLOCK - SCL
         io_PMOD_4 : inout std_logic;  -- SERIAl DATA - SDA
 
-        io_PMOD_9 : inout std_logic ; -- SERIAL CLOCK - SCL
-        io_PMOD_10 : inout std_logic;  -- SERIAl DATA - SDA
-
-
         --debugging
-        o_LED_1 : inout std_logic;
-        o_LED_2 : inout std_logic;
-        o_LED_3 : inout std_logic;
-        o_LED_4 : inout std_logic
+        o_LED_1 : out std_logic;
+        o_LED_2 : out std_logic;
+        o_LED_3 : out std_logic;
+        o_LED_4 : out std_logic
     );
 end entity DisplayTempOnSevenSegment;
 
@@ -93,10 +89,10 @@ begin
     --Instantiate module to get temprature readings
     PModTMP3I2CTempSensor_Inst : entity work.PModTMP3I2CTempSensor
         generic map (
-            g_CLKS_PER_BIT => 10
+            g_CLKS_PER_BIT => 25000000/5
         )
         port map (
-            i_Clk        => i_SlowClock,
+            i_Clk        => i_Clk,
             o_TempInCelciusMSB   => r_TempInCelciusMSB,
             o_TempInCelciusLSB   => r_TempInCelciusLSB,
             o_TempReading_Ready  => r_TempReading_Ready,
@@ -130,10 +126,10 @@ begin
      begin
          if rising_edge(i_Clk) then
            if r_TempReading_Ready = '1' then
-                --r_TempInCelciusToDisplay <= 2;
+                --r_TempInCelciusToDisplay <= r_TempInCelciusMSB;
                 o_LED_4 <= '1';
             else
-                --r_TempInCelciusToDisplay <= 1;
+                --r_TempInCelciusToDisplay <= 0;
                 o_LED_4 <= '0';
            end if;
          end if;
@@ -153,11 +149,7 @@ begin
     end process process_ObserveI2CStart;
 
   
-    --observe I2C Clock
-    o_LED_1 <= r_SCL;
-    o_LED_3 <= r_SDA;
-
-    -- these are all NOT becuase Go board makes LED light up when its low
+      -- these are all NOT becuase Go board makes LED light up when its low
     o_Segment2_A <= not w_Segment2_A;
     o_Segment2_B <= not w_Segment2_B;
     o_Segment2_C <= not w_Segment2_C;
@@ -179,9 +171,6 @@ begin
 
     io_PMOD_3 <= r_SCL;
     io_PMOD_4 <= r_SDA;
-
-    io_PMOD_9 <= r_SCL;
-    io_PMOD_10 <= r_SDA;
 
     
 end architecture RTL;
