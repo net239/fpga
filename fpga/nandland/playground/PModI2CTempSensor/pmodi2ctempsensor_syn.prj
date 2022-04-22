@@ -2,9 +2,11 @@
 #-- Project file D:\jsahni\projects\fpga\nandland\playground\PModI2CTempSensor\pmodi2ctempsensor_syn.prj
 #project files
 
-add_file -vhdl -lib work "../../modules/goboard/PModTMP3I2CTempSensor.vhd" 
-add_file -vhdl -lib work "../../modules/goboard/Binary_To_7Segment.vhd" 
-add_file -vhdl -lib work "DisplayTempOnSevenSegment.vhd" 
+add_file -vhdl -lib work "../../modules/goboard/I2c.vhd" 
+add_file -vhdl -lib work "../../modules/goboard/I2c_pkg.vhd" 
+add_file -vhdl -lib work "../../modules/goboard/Uart_2.vhd" 
+add_file -vhdl -lib work "../../modules/goboard/stringutil.vhd" 
+add_file -vhdl -lib work "I2c_example.vhd" 
 add_file -constraint -lib work "../../modules/goboard/Go_Board_Clock_Constraint.sdc"
 #implementation: "pmodi2ctempsensor_Implmnt"
 impl -add pmodi2ctempsensor_Implmnt -type fpga

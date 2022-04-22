@@ -138,7 +138,7 @@ begin
                         -- VCNL4200.
                         tx_data(1) <= x"00";
                         -- Transmit 1 byte
-                        tx_bytes <= 0;
+                        tx_bytes <= 1;
                         -- Receive two bytes
                         rx_bytes <= 2;
                         -- DO NOT INCLUDE ADDRESS BYTE IN TX_
