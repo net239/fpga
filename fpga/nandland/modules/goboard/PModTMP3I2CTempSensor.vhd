@@ -54,8 +54,12 @@ architecture RTL of PModTMP3I2CTempSensor is
 
     type    t_State is ( 
                 IDLE, 
-                WRITE_REG_ADDRESS,
-                WAIT_WRITE_ACK
+                WRITE_REG_ADDRESS, -- register address that stores temprature, write this address to output
+                WAIT_WRITE_ACK, 
+                READ_MSB,
+                READ_LSB,
+                WAIT_READ_MSB_ACK,
+                WAIT_READ_LSB_ACK
             );
     signal r_State : t_State := IDLE;
 begin
@@ -84,6 +88,7 @@ begin
         if rising_edge(i_Clk) then
             case r_State is
                 when IDLE =>
+                    o_TempReading_Ready <= '0';
                     r_State <= WRITE_REG_ADDRESS;
 
                 when WRITE_REG_ADDRESS =>
@@ -93,13 +98,33 @@ begin
 
                 when WAIT_WRITE_ACK =>
                     if r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                        r_State <= READ_MSB;
+                    elsif r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                        r_State <= IDLE;    
+                    end if;
+                when READ_MSB =>
+                    r_NumBytesToread <= 2;
+                    r_ReadOrWriteOperation <= work.I2CDriver_pkg.READ;  
+                    r_State <= WAIT_READ_MSB_ACK;
+                when WAIT_READ_MSB_ACK =>
+                    if r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                        o_TempInCelciusMSB <= r_ByteRead ;
+                        r_State <= READ_LSB;
+                    elsif r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                        r_State <= IDLE;    
+                    end if;
+                when READ_LSB =>
+                    r_State <= WAIT_READ_LSB_ACK;
+                when WAIT_READ_LSB_ACK =>
+                    if r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                        o_TempInCelciusLSB <= r_ByteRead;
+                        o_TempReading_Ready <= '1';
                         r_State <= IDLE;
                     elsif r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
                         r_State <= IDLE;    
                     end if;
                 when others =>
                     r_State <= IDLE;    
-
             end case;
         end if;
     end process process_I2CTempSensor;

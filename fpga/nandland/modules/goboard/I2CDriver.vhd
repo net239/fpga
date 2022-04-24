@@ -52,14 +52,25 @@ architecture RTL of I2CDriver is
     --state machine to read data one bit at a time
     type    t_I2C_State is ( 
                 IDLE, 
+
+                --states used to write
                 START, 
                 ADDRESS,
                 SET_WRITE_BIT,
+                WRITE_DATA, 
                 WAIT_ACK,
                 CHECK_ACK,
-                WRITE_DATA, 
                 WAIT_ACK_2,
                 CHECK_ACK_2,
+
+                --states used to read
+                --IDLE, 
+                --START, 
+                --ADDRESS,
+                SET_READ_BIT,
+                READ_DATA, 
+                SEND_READ_ACK,
+                
                 IDLE_AFTER_BIT_COMPLETION
             );
     signal r_I2C_State : t_I2C_State := IDLE;
@@ -76,6 +87,7 @@ architecture RTL of I2CDriver is
     signal r_Addr : std_logic_vector(7 downto 0);  --I2C expects MSB first
     signal r_DataToSlaveBit_Count   : integer range 0 to 7 := 0;
     signal r_DataFromSlaveBit_Count   : integer range 0 to 7 := 0;
+    signal r_NumBytesToread : integer range 1 to 16;
     
 begin
     r_Addr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_Addr'length));
@@ -108,6 +120,7 @@ begin
 
                     elsif i_ReadOrWriteOperation = work.I2CDriver_pkg.READ then -- read
                         r_ReadingOrWtiting <= work.I2CDriver_pkg.READ;
+                        r_NumBytesToread <= i_NumBytesToread;
 
                         r_I2C_State <= START;
                         o_Request_Completion_State <=  work.I2CDriver_pkg.WORKING;
@@ -126,7 +139,7 @@ begin
 
                          --middle of bit, lets pull SDA low when SCL is High - Start condition of I2C Protocol
                          if  r_SCL = '1' then
-                            if r_SDA = '0' then
+                            if io_SDA = '0' then
                                 --someone else is pulling SDA low?
                                 r_I2C_State <= IDLE_AFTER_BIT_COMPLETION;
                                 o_Request_Completion_State <=  work.I2CDriver_pkg.COMPLETED_ERROR;
@@ -147,10 +160,23 @@ begin
 
                             if r_DataToSlaveBit_Count = (r_Addr'length - 2) then -- count only - 0,1,2,3,4,5,6 and then roll over                           
                                 r_DataToSlaveBit_Count  <= 0;
-                                r_I2C_State <= SET_WRITE_BIT;
+
+                                if r_ReadingOrWtiting = work.I2CDriver_pkg.READ then
+                                    r_I2C_State <= SET_READ_BIT;
+                                else
+                                    r_I2C_State <= SET_WRITE_BIT;
+                                end if;
+                                
                             else
                                 r_DataToSlaveBit_Count <= r_DataToSlaveBit_Count + 1;
                             end if;
+                        end if;
+                    end if;
+                when SET_READ_BIT =>
+                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
+                        if  r_SCL = '0' then -- change data only when SCL is low
+                            r_SDA <= '1'; -- Set this to 1 - Read
+                            r_I2C_State <= WAIT_ACK;
                         end if;
                     end if;
                 when SET_WRITE_BIT =>
@@ -163,7 +189,7 @@ begin
                 when WAIT_ACK =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then 
-                            r_SDA <= '1' ; --set SDA High so we can let slave bring it down
+                            --r_SDA <= '1' ; --set SDA High so we can let slave bring it down
                             r_I2C_State <= CHECK_ACK;
                         end if;
                     end if;    
@@ -172,7 +198,14 @@ begin
                         if  r_SCL = '1' then 
                             if r_SDA = '0' then
                                 r_DataToSlaveBit_Count  <= 0;
-                                r_I2C_State <= WRITE_DATA;
+                                r_DataFromSlaveBit_Count <= 0;
+
+                                if r_ReadingOrWtiting = work.I2CDriver_pkg.READ then
+                                    r_I2C_State <= READ_DATA;
+                                else
+                                    r_I2C_State <= WRITE_DATA;
+                                end if;
+                                
                             else
                                 -- did not get ACK ??
                                 r_I2C_State <= IDLE_AFTER_BIT_COMPLETION;
@@ -195,10 +228,38 @@ begin
                             end if;
                         end if;
                     end if;    
+                when READ_DATA =>
+                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
+                        if  r_SCL = '1' then 
+                             --send  bits MSB fist
+                            -- so when r_DataToSlaveBit_Count is zero, we want to pick bit 8 
+                            o_ByteRead(o_ByteRead'length - 2 - r_DataFromSlaveBit_Count) <= r_SDA ; --I2C expects MSB first
+
+                            if r_DataFromSlaveBit_Count = (r_ByteToWrite'length - 1) then -- count only - 0,1,2,3,4,5,6,7 and then roll over                           
+                                r_DataFromSlaveBit_Count  <= 0;
+                                r_NumBytesToread <= r_NumBytesToread - 1;
+                                r_I2C_State <= SEND_READ_ACK;
+                            else
+                                r_DataFromSlaveBit_Count <= r_DataFromSlaveBit_Count + 1;
+                            end if;
+                        end if;
+                    end if;    
+                when SEND_READ_ACK =>
+                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
+                        if  r_SCL = '0' then -- change data only when SCL is low
+                            r_SDA <= '0'; -- Set this to 0 - ACK
+
+                            if r_NumBytesToread = 0 then
+                                r_I2C_State <= IDLE_AFTER_BIT_COMPLETION;
+                            else
+                                r_I2C_State <= READ_DATA;
+                            end if;
+                        end if;
+                    end if;
                 when WAIT_ACK_2 =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then 
-                            r_SDA <= '1' ; --set SDA High so we can let slave bring it down
+                            --r_SDA <= '1' ; --set SDA High so we can let slave bring it down
                             r_I2C_State <= CHECK_ACK_2;
                         end if;
                     end if;       

@@ -39,9 +39,6 @@ architecture RTL of DisplayTempOnSevenSegment is
     signal r_TempReading_Ready    : std_logic := '0';  -- reading from Temp sensor is ready 
     signal r_StateAsNumber : integer range 0 to 32 := 0; --for debugging
 
-    signal r_Clk_Count :  integer := 0; -- to generate a slow clock
-    signal i_SlowClock    : std_logic := '0';
-
     signal w_Segment1_A, w_Segment2_A : std_logic;
     signal w_Segment1_B, w_Segment2_B : std_logic;
     signal w_Segment1_C, w_Segment2_C : std_logic;
