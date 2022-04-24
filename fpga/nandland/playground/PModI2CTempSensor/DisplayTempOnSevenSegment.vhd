@@ -111,8 +111,19 @@ begin
     o_Segment1_F <= not w_Segment1_F;
     o_Segment1_G <= not w_Segment1_G;
 
-    r_TempInCelciusToDisplay <= std_logic_vector(to_unsigned(r_StateAsNumber,r_TempInCelciusToDisplay'length));
+    -- fetch the temp to be displayed     
+    process_updateTempToDisplay : process (i_Clk)
+    begin
+        if rising_edge(i_Clk) then
+          if r_TempReading_Ready = '1' then
+               r_TempInCelciusToDisplay <= r_TempInCelciusMSB;
+           else
+               r_TempInCelciusToDisplay <= 0;
+          end if;
+        end if;
+    end process process_updateTempToDisplay;
 
+    
     io_PMOD_3 <= r_SCL;
     io_PMOD_4 <= r_SDA;
 

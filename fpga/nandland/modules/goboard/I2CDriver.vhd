@@ -189,7 +189,7 @@ begin
                 when WAIT_ACK =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then 
-                            --r_SDA <= '1' ; --set SDA High so we can let slave bring it down
+                            r_SDA <= '1' ; --set SDA High so we can let slave bring it down
                             r_I2C_State <= CHECK_ACK;
                         end if;
                     end if;    
@@ -259,7 +259,7 @@ begin
                 when WAIT_ACK_2 =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then 
-                            --r_SDA <= '1' ; --set SDA High so we can let slave bring it down
+                            r_SDA <= '1' ; --set SDA High so we can let slave bring it down
                             r_I2C_State <= CHECK_ACK_2;
                         end if;
                     end if;       
