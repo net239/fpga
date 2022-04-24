@@ -58,6 +58,8 @@ architecture RTL of I2CDriver is
                 WAIT_ACK,
                 CHECK_ACK,
                 WRITE_DATA, 
+                WAIT_ACK_2,
+                CHECK_ACK_2,
                 IDLE_AFTER_BIT_COMPLETION
             );
     signal r_I2C_State : t_I2C_State := IDLE;
@@ -159,14 +161,11 @@ begin
                         end if;
                     end if;
                 when WAIT_ACK =>
-                    if r_Clk_Count =  0 then          
+                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then 
                             r_SDA <= '1' ; --set SDA High so we can let slave bring it down
-                        end if;
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
-                        if  r_SCL = '0' then 
                             r_I2C_State <= CHECK_ACK;
-                        end if;    
+                        end if;
                     end if;    
                 when CHECK_ACK =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
@@ -190,12 +189,32 @@ begin
 
                             if r_DataToSlaveBit_Count = (r_ByteToWrite'length - 1) then -- count only - 0,1,2,3,4,5,6,7 and then roll over                           
                                 r_DataToSlaveBit_Count  <= 0;
-                                r_I2C_State <= IDLE_AFTER_BIT_COMPLETION;
+                                r_I2C_State <= WAIT_ACK_2;
                             else
                                 r_DataToSlaveBit_Count <= r_DataToSlaveBit_Count + 1;
                             end if;
                         end if;
                     end if;    
+                when WAIT_ACK_2 =>
+                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
+                        if  r_SCL = '0' then 
+                            r_SDA <= '1' ; --set SDA High so we can let slave bring it down
+                            r_I2C_State <= CHECK_ACK_2;
+                        end if;
+                    end if;       
+                when CHECK_ACK_2 =>
+                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
+                        if  r_SCL = '1' then 
+                            if r_SDA = '0' then
+                                r_I2C_State <= IDLE_AFTER_BIT_COMPLETION;
+                                o_Request_Completion_State <=  work.I2CDriver_pkg.COMPLETED_OK;
+                            else
+                                -- did not get ACK ??
+                                r_I2C_State <= IDLE_AFTER_BIT_COMPLETION;
+                                o_Request_Completion_State <=  work.I2CDriver_pkg.COMPLETED_ERROR;
+                            end if;
+                        end if;
+                    end if;       
                 when IDLE_AFTER_BIT_COMPLETION =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then 
