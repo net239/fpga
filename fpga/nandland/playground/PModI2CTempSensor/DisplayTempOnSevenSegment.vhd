@@ -26,14 +26,9 @@ entity DisplayTempOnSevenSegment is
         o_Segment2_G  : out std_logic;
 
         -- PMOD based temp sensor
-        io_PMOD_3 : out std_logic ; -- SERIAL CLOCK - SCL
-        io_PMOD_4 : inout std_logic;  -- SERIAl DATA - SDA
+        io_PMOD_3 : inout std_logic ; -- SERIAL CLOCK - SCL
+        io_PMOD_4 : inout std_logic  -- SERIAl DATA - SDA
 
-        --debugging
-        o_LED_1 : out std_logic;
-        o_LED_2 : out std_logic;
-        o_LED_3 : out std_logic;
-        o_LED_4 : out std_logic
     );
 end entity DisplayTempOnSevenSegment;
 
@@ -57,7 +52,6 @@ architecture RTL of DisplayTempOnSevenSegment is
 
     signal r_SCL : std_logic := '0';
     signal r_SDA : std_logic := '0';
-    signal r_SDA_Last : std_logic := '0';
 begin
     -- Instantiate Binary to 7-Segment Converter
     SevenSeg1_Inst : entity work.Binary_To_7Segment
@@ -101,54 +95,7 @@ begin
             io_SDA => r_SDA
     );
 
-    --slow down clock
-    process_slowClock  : process (i_Clk)
-    begin
-        if rising_edge(i_Clk) then
-            if r_Clk_Count = 0  then
-                if i_SlowClock = '1'  then
-                    i_SlowClock <= '0';
-                else
-                    i_SlowClock <= '1';
-                end if;
-
-                r_Clk_Count <= r_Clk_Count + 1;
-            elsif  r_Clk_Count = (25000000/5 - 1) then
-                r_Clk_Count <= 0;
-            else
-                r_Clk_Count <= r_Clk_Count + 1;
-            end if;
-        end if;
-    end process process_slowClock;
-
-     -- fetch the temp to be displayed     
-     process_updateTempToDisplay : process (i_Clk)
-     begin
-         if rising_edge(i_Clk) then
-           if r_TempReading_Ready = '1' then
-                --r_TempInCelciusToDisplay <= r_TempInCelciusMSB;
-                o_LED_4 <= '1';
-            else
-                --r_TempInCelciusToDisplay <= 0;
-                o_LED_4 <= '0';
-           end if;
-         end if;
-     end process process_updateTempToDisplay;
-
-    -- observe I2C Start
-    process_ObserveI2CStart  : process (r_SDA)
-    begin
-        if falling_edge(r_SDA) then
-            --check for Start condition
-            if r_SCL = '1' then -- SCL is up
-                o_LED_2 <= '1';
-            else
-                o_LED_2 <= '0';
-            end if;
-        end if;
-    end process process_ObserveI2CStart;
-
-  
+     
       -- these are all NOT becuase Go board makes LED light up when its low
     o_Segment2_A <= not w_Segment2_A;
     o_Segment2_B <= not w_Segment2_B;

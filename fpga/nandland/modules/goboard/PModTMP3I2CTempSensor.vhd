@@ -1,6 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.I2CDriver_pkg.all;
 
 -- read temprature from Digilent Pmod TMP3 Temprature sensor
 -- refer https://digilent.com/reference/pmod/pmodtmp3/reference-manual
@@ -16,10 +17,12 @@ entity PModTMP3I2CTempSensor is
     generic (
         I2C_DEVICE_ADDRESS: integer := 16#4F# ; -- hexadeciaml 0x48 - if JP1/JP2/JP3 all are set to GND the address for this PMOD sensor is 0x48. 7 BIT address
 
-        I2C_DEVICE_TEMP_REGISTER: integer := 16#00# ; -- address of the register in device that stores the temprature
+        I2C_DEVICE_TEMP_REGISTER: integer := 16#0# ; -- address of the register in device that stores the temprature
 
         -- Clocks per bit
-        g_CLKS_PER_BIT : integer := 25000            -- Clock speed divided by rate  - 25,000,000 / 1,000
+        -- The i_Clk clock provided by this will be counted g_CLKS_PER_BIT times to generate one bit of information on I2C. - to drive io_SCL Clock
+        -- I2C standard speed is 100kbps, Fast Mode is 400Kbps and High Speed mode is 3.4Mbps
+        g_CLKS_PER_BIT : integer := 52500            -- Clock speed divided by rate  - 25,000,000 / 1,000
     );
     port (
         -- Main Clock - 25Mhz
@@ -39,413 +42,69 @@ entity PModTMP3I2CTempSensor is
 end entity PModTMP3I2CTempSensor;
 
 architecture RTL of PModTMP3I2CTempSensor is
+    signal r_ReadOrWriteOperation: work.I2CDriver_pkg.t_Request_Type := work.I2CDriver_pkg.IDLE; -- un initialized
+    signal r_NumBytesToread : integer range 1 to 16;
 
-    --state machine to read data one bit at a time
-    type    I2CReadingStateMachine is ( 
-                state_PrepareStart, 
-                state_Start_B1, state_Address_B1, state_WriteBit_B1, state_AckFromSlave_B1, 
-                state_RegisterAddress_B2, state_AckFromSlave_B2, 
-                state_Start_B3, state_Address_B3, state_ReadBit_B3, state_AckFromSlave_B3, 
-                state_DataFromSlaveMSB,state_DataFromSlaveMSBAck,
-                state_DataFromSlaveLSB,state_DataFromSlaveLSBAck
+    signal r_ByteRead  :  std_logic_vector(7 downto 0);
+    signal r_ByteReady :  std_logic;
+    signal r_ByteToWrite  :  std_logic_vector(7 downto 0);
+
+    signal r_Request_Completion_State :   work.I2CDriver_pkg.t_Request_State;
+    
+
+    type    t_State is ( 
+                IDLE, 
+                WRITE_REG_ADDRESS,
+                WAIT_WRITE_ACK
             );
-    signal r_I2CReadingStateMachine : I2CReadingStateMachine := state_PrepareStart;
-    signal r_StateAsNumber : integer range 0 to 32 := 0; --for debugging
-    signal r_Clk_Count   : integer range 0 to g_CLKS_PER_BIT-1 := 0;
-
-    signal r_AddrBit_Count   : integer range 0 to 7 := 0;
-    signal r_Addr : std_logic_vector(7 downto 0);  --I2C expects MSB first
-    signal r_TempRegisterAddr : std_logic_vector(7 downto 0);  --I2C expects MSB first
-    signal r_DataFromSlaveBit_Count   : integer range 0 to 7 := 0;
-    signal r_TempReading_Ready : std_logic := '0';
-    
+    signal r_State : t_State := IDLE;
 begin
-    r_Addr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_Addr'length));
-    r_TempRegisterAddr <= std_logic_vector(to_unsigned(I2C_DEVICE_TEMP_REGISTER,r_Addr'length));
 
-    o_TempReading_Ready <= r_TempReading_Ready;
-    r_StateAsNumber <= I2CReadingStateMachine'POS(r_I2CReadingStateMachine) ; 
-    o_StateAsNumber <= r_StateAsNumber;
-   
-    
-    -- Purpose: Control RX state machine
-    process_I2C_RX : process (i_Clk)
+     --Instantiate module to get temprature readings
+     I2CDriver_Inst : entity work.I2CDriver
+     generic map (
+        g_CLKS_PER_BIT => g_CLKS_PER_BIT,
+        I2C_DEVICE_ADDRESS => I2C_DEVICE_ADDRESS
+     )
+     port map (
+         i_Clk        => i_Clk,
+         i_ReadOrWriteOperation   => r_ReadOrWriteOperation,
+         o_StateAsNumber  => o_StateAsNumber,
+         i_NumBytesToread => r_NumBytesToread,
+         i_ByteToWrite => r_ByteToWrite,
+         o_ByteRead => r_ByteRead,
+         o_ByteReady => r_ByteReady,
+         o_Request_Completion_State => r_Request_Completion_State,
+         io_SCL => io_SCL,
+         io_SDA => io_SDA
+    );
+
+    process_I2CTempSensor : process (i_Clk)
     begin
         if rising_edge(i_Clk) then
-            case r_I2CReadingStateMachine is
-                when state_PrepareStart =>
-                    -- lets first set SCL High and SDA High - We will later check if it remains high to make sure no one else is pulling it down
-                    io_SCL <= '1'; 
-                    io_SDA <= '1';
-                    r_Clk_Count <= 0;
-                    r_AddrBit_Count <= 0;
-                    r_I2CReadingStateMachine <= state_Start_B1;
-                when state_Start_B1 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then
-                        r_Clk_Count <= 0;    
+            case r_State is
+                when IDLE =>
+                    r_State <= WRITE_REG_ADDRESS;
 
-                        --lets now set SDA Low ( While SCL is high) - this is the START condition
-                        if io_SCL = '0' or io_SDA = '0' then
-                            -- lets make sure no one else has pulled the lines low
-                            -- looks like the bus is busy, lets try after some time
-                            r_I2CReadingStateMachine <= state_PrepareStart;
-                        else
-                            --all good, lets send START condition
-                            io_SDA <= '0';
-                            r_I2CReadingStateMachine <= state_Address_B1;
-                        end if;
-                    else
-                        io_SCL <= '1'; 
-                        io_SDA <= '1';
-                        r_Clk_Count <= r_Clk_Count + 1;
+                when WRITE_REG_ADDRESS =>
+                    r_ByteToWrite <= std_logic_vector(to_unsigned(I2C_DEVICE_TEMP_REGISTER,r_ByteToWrite'length));
+                    r_ReadOrWriteOperation <= work.I2CDriver_pkg.WRITE;  
+                    r_State <= WAIT_WRITE_ACK;
+
+                when WAIT_WRITE_ACK =>
+                    if r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                        r_State <= IDLE;
+                    elsif r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                        r_State <= IDLE;    
                     end if;
-                when state_Address_B1 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;
-
-                        -- lets bring down clock so we can start changing data 
-                        io_SCL <= '0'; 
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-
-                        --send address bits MSB fist
-                        -- so when r_AddrBit_Count is zero, we want to pick bit 7 ( since address in I2C is 7 bit)
-                        io_SDA <= r_Addr(r_Addr'length - 2 - r_AddrBit_Count); --I2C expects MSB first
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if r_AddrBit_Count = (r_Addr'length - 2) then -- count only - 0,1,2,3,4,5,6 and then roll over                           
-                            r_AddrBit_Count  <= 0;
-                            r_I2CReadingStateMachine <= state_WriteBit_B1;
-                        else
-                            r_AddrBit_Count <= r_AddrBit_Count + 1;
-                        end if;
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;
-                when state_WriteBit_B1 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-
-                        -- lets bring down clock so we can start changing data
-                        io_SCL <= '0'; 
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;        
-
-                        io_SDA <= '0'; -- Set this to W - Write as we are setting register pointer, 0 is write
-                        
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;    
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        r_I2CReadingStateMachine <= state_AckFromSlave_B1;        
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;    
-                when state_AckFromSlave_B1 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        -- lets bring down clock so we can start getting data
-                        io_SCL <= '0'; 
-
-                        
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;        
-                        
-                        --release SDA so slave can write
-                        io_SDA <= '1';
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;        
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if io_SDA = '0' then
-                            r_I2CReadingStateMachine <= state_RegisterAddress_B2;        
-                        else
-                            r_I2CReadingStateMachine <= state_PrepareStart;        -- restarting since we did not get ack
-                        end if;
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;       
-                when state_RegisterAddress_B2 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;
-
-                        -- lets bring down clock so we can start changing data 
-                        io_SCL <= '0'; 
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-
-                        --send address bits MSB fist
-                        -- so when r_AddrBit_Count is zero, we want to pick bit 7 ( since address in I2C is 7 bit)
-                        io_SDA <= r_TempRegisterAddr(r_TempRegisterAddr'length - 1 - r_AddrBit_Count); --I2C expects MSB first
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if r_AddrBit_Count = (r_TempRegisterAddr'length - 1) then -- count only - 0,1,2,3,4,5,6,7 and then roll over                           
-                            r_AddrBit_Count  <= 0;
-                            r_I2CReadingStateMachine <= state_AckFromSlave_B2;
-                        else
-                            r_AddrBit_Count <= r_AddrBit_Count + 1;
-                        end if;
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;    
-                when state_AckFromSlave_B2 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        -- lets bring down clock so we can start getting data
-                        io_SCL <= '0'; 
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;        
-                        
-                        --release SDA so slave can write
-                        io_SDA <= '1';
-
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;        
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if io_SDA = '0' then
-                            r_I2CReadingStateMachine <= state_Start_B3;        
-                        else
-                            r_I2CReadingStateMachine <= state_PrepareStart;        -- restarting since we did not get ack
-                        end if;
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;  
-                when state_Start_B3 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then
-                        r_Clk_Count <= 0;    
-
-                        --lets now set SDA Low ( While SCL is high) - this is the START condition
-                        if io_SCL = '0' or io_SDA = '0' then
-                            -- lets make sure no one else has pulled the lines low
-                            -- looks like the bus is busy, lets try after some time
-                            r_I2CReadingStateMachine <= state_PrepareStart;
-                        else
-                            --all good, lets send START condition
-                            io_SDA <= '0';
-                            r_I2CReadingStateMachine <= state_Address_B3;
-                        end if;
-                    else
-                        io_SCL <= '1'; 
-                        io_SDA <= '1';
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;
-                when state_Address_B3 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;
-
-                        -- lets bring down clock so we can start changing data 
-                        io_SCL <= '0'; 
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-
-                        --send address bits MSB fist
-                        -- so when r_AddrBit_Count is zero, we want to pick bit 7 ( since address in I2C is 7 bit)
-                        io_SDA <= r_Addr(r_Addr'length - 2 - r_AddrBit_Count); --I2C expects MSB first
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if r_AddrBit_Count = (r_Addr'length - 2) then -- count only - 0,1,2,3,4,5,6 and then roll over                           
-                            r_AddrBit_Count  <= 0;
-                            r_I2CReadingStateMachine <= state_ReadBit_B3;
-                        else
-                            r_AddrBit_Count <= r_AddrBit_Count + 1;
-                        end if;
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;
-                when state_ReadBit_B3 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-
-                        -- lets bring down clock so we can start changing data
-                        io_SCL <= '0'; 
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;        
-
-                        io_SDA <= '1'; -- Set this to R - Write as we are reading temprature 
-                        
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;    
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        r_I2CReadingStateMachine <= state_AckFromSlave_B3;        
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;    
-                when state_AckFromSlave_B3 =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        -- lets bring down clock so we can start getting data
-                        io_SCL <= '0'; 
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        --release SDA so slave can write
-                        io_SDA <= '1';
-                        
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;        
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if io_SDA = '0' then
-                            r_I2CReadingStateMachine <= state_DataFromSlaveMSB;        
-                        else
-                            r_I2CReadingStateMachine <= state_PrepareStart;        -- restarting since we did not get ack
-                        end if;
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;                 
-                when state_DataFromSlaveMSB =>
-                    r_TempReading_Ready <= '0'; -- mark this as we are now reading the data
-
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        -- lets bring down clock so we can start changing data
-                        io_SCL <= '0';
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;            
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if r_DataFromSlaveBit_Count < 7 then
-                            --read data
-                            o_TempInCelciusMSB(r_DataFromSlaveBit_Count) <= io_SDA;
-                            r_DataFromSlaveBit_Count <= r_DataFromSlaveBit_Count + 1;
-                        else
-                            r_DataFromSlaveBit_Count  <= 0;
-                            r_I2CReadingStateMachine <= state_DataFromSlaveMSBAck;
-                        end if;    
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;       
-                when state_DataFromSlaveMSBAck =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        -- lets bring down clock so we can start changing data
-                        io_SCL <= '0';
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;            
-
-                        -- send ACk
-                        io_SDA <= '0';
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-                        
-                        r_I2CReadingStateMachine <= state_DataFromSlaveLSB;  
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;             
-                when state_DataFromSlaveLSB =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        -- lets bring down clock so we can start changing data
-                        io_SCL <= '0';
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;            
-                        
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;                        
-
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-
-                        if r_DataFromSlaveBit_Count < 7 then
-                            --read data
-                            o_TempInCelciusLSB(r_DataFromSlaveBit_Count) <= io_SDA;
-                            r_DataFromSlaveBit_Count <= r_DataFromSlaveBit_Count + 1;
-                        else
-                            r_DataFromSlaveBit_Count  <= 0;
-                            r_I2CReadingStateMachine <= state_DataFromSlaveLSBAck;
-                        end if;    
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;  
-                when state_DataFromSlaveLSBAck =>
-                    if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then    
-                        r_Clk_Count <= r_Clk_Count + 1;    
-                        
-                        -- lets bring down clock so we can start changing data
-                        io_SCL <= '0';
-
-                    elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2  + ( g_CLKS_PER_BIT-1) / 4 then    
-                        r_Clk_Count <= r_Clk_Count + 1;            
-
-                        --send ACk
-                        io_SDA <= '1';
-
-                        
-                   elsif r_Clk_Count = ( g_CLKS_PER_BIT-1) then    
-                        r_Clk_Count <= 0;                         
-
-                        
-                        -- clock UP to indicate data is stable
-                        io_SCL <= '1'; 
-                        
-                        r_I2CReadingStateMachine <= state_PrepareStart;  
-
-                        --indicate we are done reading both bytes
-                        r_TempReading_Ready <= '1';
-
-                    else
-                        r_Clk_Count <= r_Clk_Count + 1;
-                    end if;                                      
                 when others =>
-                    r_I2CReadingStateMachine <= state_PrepareStart;
+                    r_State <= IDLE;    
+
             end case;
         end if;
-    end process process_I2C_RX;
+    end process process_I2CTempSensor;
+
+
+
 
 end architecture RTL;
