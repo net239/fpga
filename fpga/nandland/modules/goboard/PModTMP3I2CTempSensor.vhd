@@ -22,7 +22,7 @@ entity PModTMP3I2CTempSensor is
         -- Clocks per bit
         -- The i_Clk clock provided by this will be counted g_CLKS_PER_BIT times to generate one bit of information on I2C. - to drive io_SCL Clock
         -- I2C standard speed is 100kbps, Fast Mode is 400Kbps and High Speed mode is 3.4Mbps
-        g_CLKS_PER_BIT : integer := 52500            -- Clock speed divided by rate  - 25,000,000 / 1,000
+        g_CLKS_PER_BIT : integer := 251            -- Clock speed divided by rate  - 25,000,000 / 100000
     );
     port (
         -- Main Clock - 25Mhz
@@ -34,7 +34,7 @@ entity PModTMP3I2CTempSensor is
         o_TempInCelciusLSB   : out std_logic_vector(7 downto 0);
         o_TempReading_Ready  : out std_logic;
 
-        o_StateAsNumber             : out  integer range 0 to 32; --for debugging      
+        o_I2CStateForDebugging             : out  integer range 0 to 32; --for debugging      
 
         io_SCL : inout std_logic ; -- SERIAL CLOCK - SCL
         io_SDA : inout std_logic  -- SERIAl DATA - SDA
@@ -45,12 +45,15 @@ architecture RTL of PModTMP3I2CTempSensor is
     signal r_ReadOrWriteOperation: work.I2CDriver_pkg.t_Request_Type := work.I2CDriver_pkg.IDLE; -- un initialized
     signal r_NumBytesToread : integer range 1 to 16;
 
-    signal r_ByteRead  :  std_logic_vector(7 downto 0);
-    signal r_ByteReady :  std_logic;
-    signal r_ByteToWrite  :  std_logic_vector(7 downto 0);
+    signal r_I2CByteRead  :  std_logic_vector(7 downto 0);
+    signal r_I2CByteReady :  std_logic;
+    signal r_I2CByteToWrite  :  std_logic_vector(7 downto 0);
 
-    signal r_Request_Completion_State :   work.I2CDriver_pkg.t_Request_State;
-    
+    signal r_I2CRequest_Completion_State :   work.I2CDriver_pkg.t_Request_State;
+    signal r_I2CReadOrWrite :  std_logic;
+    signal r_I2CAddr : std_logic_vector(6 downto 0);  --I2C expects MSB first
+
+    signal r_I2CStateForDebugging          :   integer range 0 to 32; --for debugging      
 
     type    t_State is ( 
                 IDLE, 
@@ -64,6 +67,9 @@ architecture RTL of PModTMP3I2CTempSensor is
     signal r_State : t_State := IDLE;
 begin
 
+    r_I2CAddr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_I2CAddr'length));
+    o_I2CStateForDebugging <= r_I2CStateForDebugging;
+
      --Instantiate module to get temprature readings
      I2CDriver_Inst : entity work.I2CDriver
      generic map (
@@ -73,12 +79,12 @@ begin
      port map (
          i_Clk        => i_Clk,
          i_ReadOrWriteOperation   => r_ReadOrWriteOperation,
-         o_StateAsNumber  => o_StateAsNumber,
+         o_StateForDebugging  => r_I2CStateForDebugging,
          i_NumBytesToread => r_NumBytesToread,
-         i_ByteToWrite => r_ByteToWrite,
-         o_ByteRead => r_ByteRead,
-         o_ByteReady => r_ByteReady,
-         o_Request_Completion_State => r_Request_Completion_State,
+         i_ByteToWrite => r_I2CByteToWrite,
+         o_ByteRead => r_I2CByteRead,
+         o_ByteReady => r_I2CByteReady,
+         o_Request_Completion_State => r_I2CRequest_Completion_State,
          io_SCL => io_SCL,
          io_SDA => io_SDA
     );
@@ -92,14 +98,13 @@ begin
                     r_State <= WRITE_REG_ADDRESS;
 
                 when WRITE_REG_ADDRESS =>
-                    r_ByteToWrite <= std_logic_vector(to_unsigned(I2C_DEVICE_TEMP_REGISTER,r_ByteToWrite'length));
+                    r_I2CByteToWrite <= std_logic_vector(to_unsigned(I2C_DEVICE_TEMP_REGISTER,r_I2CByteToWrite'length));
                     r_ReadOrWriteOperation <= work.I2CDriver_pkg.WRITE;  
                     r_State <= WAIT_WRITE_ACK;
-
                 when WAIT_WRITE_ACK =>
-                    if r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                    if r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
                         r_State <= READ_MSB;
-                    elsif r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                    elsif r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
                         r_State <= IDLE;    
                     end if;
                 when READ_MSB =>
@@ -107,20 +112,20 @@ begin
                     r_ReadOrWriteOperation <= work.I2CDriver_pkg.READ;  
                     r_State <= WAIT_READ_MSB_ACK;
                 when WAIT_READ_MSB_ACK =>
-                    if r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
-                        o_TempInCelciusMSB <= r_ByteRead ;
+                    if r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                        o_TempInCelciusMSB <= r_I2CByteRead ;
                         r_State <= READ_LSB;
-                    elsif r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                    elsif r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
                         r_State <= IDLE;    
                     end if;
                 when READ_LSB =>
                     r_State <= WAIT_READ_LSB_ACK;
                 when WAIT_READ_LSB_ACK =>
-                    if r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
-                        o_TempInCelciusLSB <= r_ByteRead;
+                    if r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                        o_TempInCelciusLSB <= r_I2CByteRead;
                         o_TempReading_Ready <= '1';
                         r_State <= IDLE;
-                    elsif r_Request_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                    elsif r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
                         r_State <= IDLE;    
                     end if;
                 when others =>
@@ -129,7 +134,6 @@ begin
         end if;
     end process process_I2CTempSensor;
 
-
-
+  
 
 end architecture RTL;

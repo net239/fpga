@@ -15,12 +15,11 @@ entity I2CDriver is
         -- Clocks per bit
         -- The i_Clk clock provided by this will be counted g_CLKS_PER_BIT times to generate one bit of information on I2C. - to drive io_SCL Clock
         -- I2C standard speed is 100kbps, Fast Mode is 400Kbps and High Speed mode is 3.4Mbps
-        g_CLKS_PER_BIT : integer := 52500            
+        g_CLKS_PER_BIT : integer := 251            -- Clock speed divided by rate  - 25,000,000 / 100000          
        
     );
     port (
         -- Main Clock - 25Mhz
-        
         i_Clk         : in std_logic;
 
         -- read or write operation to be performed next
@@ -39,8 +38,7 @@ entity I2CDriver is
         -- Write or Read operation Stage 0 - Working, 1 - Completed Success, 2 - Completed Error
         o_Request_Completion_State :  out work.I2CDriver_pkg.t_Request_State;
 
-
-        o_StateAsNumber             : out  integer range 0 to 32; --for debugging      
+        o_StateForDebugging             : out  integer range 0 to 32; --for debugging      
 
         io_SCL : inout std_logic ; -- SERIAL CLOCK - SCL
         io_SDA : inout std_logic  -- SERIAl DATA - SDA
@@ -92,7 +90,7 @@ architecture RTL of I2CDriver is
     
 begin
     r_Addr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_Addr'length));
-    o_StateAsNumber <= t_I2C_State'POS(r_I2C_State) ; 
+    o_StateForDebugging <= t_I2C_State'POS(r_I2C_State) ; 
    
     -- process to generate clock signal for slave
     generate_SCL : process (i_Clk)
@@ -130,7 +128,6 @@ begin
 
                     else
                         o_Request_Completion_State <=  work.I2CDriver_pkg.IDLE;
-
                     end if;
                 when START =>
                     r_DataToSlaveBit_Count <= 0;
@@ -200,7 +197,7 @@ begin
                 when CHECK_ACK =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '1' then 
-                            if r_SDA = '0' then
+                            if io_SDA = '0' then -- check if the SDA is still low
                                 r_DataToSlaveBit_Count  <= 0;
                                 r_DataFromSlaveBit_Count <= 0;
 
@@ -244,6 +241,8 @@ begin
                                 r_DataFromSlaveBit_Count  <= 0;
                                 r_NumBytesToread <= r_NumBytesToread - 1;
                                 r_I2C_State <= SEND_READ_ACK;
+
+                                o_Request_Completion_State <=  work.I2CDriver_pkg.COMPLETED_OK;
                             else
                                 r_DataFromSlaveBit_Count <= r_DataFromSlaveBit_Count + 1;
                             end if;
@@ -258,6 +257,7 @@ begin
                                 r_I2C_NextState <= IDLE;
                                 r_I2C_State <= SET_NEXT_STATE;
                             else
+                                o_Request_Completion_State <=  work.I2CDriver_pkg.WORKING;
                                 r_I2C_State <= READ_DATA;
                             end if;
                         end if;
@@ -272,7 +272,7 @@ begin
                 when CHECK_ACK_2 =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '1' then 
-                            if r_SDA = '0' then
+                            if io_SDA = '0' then  -- check if the SDA is still low
                                 r_I2C_NextState <= IDLE;
                                 r_I2C_State <= SET_NEXT_STATE;
                                 o_Request_Completion_State <=  work.I2CDriver_pkg.COMPLETED_OK;
@@ -298,7 +298,8 @@ begin
     end process process_I2C;
 
     -- output clock only when we are not in idle state
-    io_SCL <= 'Z' when r_I2C_State = IDLE else r_SCL;
-    io_SDA <= 'Z' when r_I2C_State = IDLE else r_SDA;
+    -- NOTE - 1 is indicated in I2C by releasing the line
+    io_SCL <= 'Z' when (r_I2C_State = IDLE or r_SCL = '1') else r_SCL;
+    io_SDA <= 'Z' when (r_I2C_State = IDLE or r_SDA = '1' ) else r_SDA;
 
 end architecture RTL;

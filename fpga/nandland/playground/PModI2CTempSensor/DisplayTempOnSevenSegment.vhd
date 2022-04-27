@@ -30,10 +30,10 @@ entity DisplayTempOnSevenSegment is
         io_PMOD_4 : inout std_logic ; -- SERIAl DATA - SDA
 
         --debugging
-        o_LED_1 : out std_logic;
-        o_LED_2 : out std_logic;
-        o_LED_3 : out std_logic;
-        o_LED_4 : out std_logic;
+        o_LED_1 : inout std_logic;
+        o_LED_2 : inout std_logic;
+        o_LED_3 : inout std_logic;
+        o_LED_4 : inout std_logic;
 
         i_UART_RX     : in std_logic;
         o_UART_TX     : out std_logic
@@ -47,10 +47,10 @@ architecture RTL of DisplayTempOnSevenSegment is
     signal r_TempInCelciusToDisplay : std_logic_vector(7 downto 0) := 0;
     signal r_TempReading_Ready    : std_logic := '0';  -- reading from Temp sensor is ready 
 
-    signal r_StateAsNumber : integer range 0 to 99 := 0; --for debugging
-    signal r_LastStateAsNumber : integer range 0 to 99 := 99; --for debugging
+    signal r_StateForDebugging : integer range 0 to 99 := 0; --for debugging
+    signal r_LastStateForDebugging : integer range 0 to 99 := 99; --for debugging
     signal r_StateChanged    : std_logic := '1';  
-    signal r_StateAsByte     : std_logic_vector(7 downto 0);  
+    signal r_StateAsByte     : std_logic_vector(7 downto 0) := "00111111" ; -- '?'
 
     signal w_Segment1_A, w_Segment2_A : std_logic;
     signal w_Segment1_B, w_Segment2_B : std_logic;
@@ -116,7 +116,7 @@ begin
             o_TempInCelciusMSB   => r_TempInCelciusMSB,
             o_TempInCelciusLSB   => r_TempInCelciusLSB,
             o_TempReading_Ready  => r_TempReading_Ready,
-            o_StateAsNumber  => r_StateAsNumber,
+            o_I2CStateForDebugging  => r_StateForDebugging,
             io_SCL => r_SCL,
             io_SDA => r_SDA
     );
@@ -125,17 +125,17 @@ begin
     process_trackStateChange : process (i_Clk)
     begin
         if rising_edge(i_Clk) then
-          if r_StateAsNumber = r_LastStateAsNumber   then
+          if r_StateForDebugging = r_LastStateForDebugging   then
                 r_StateChanged <= '0';
            else
                 r_StateChanged <= '1';
                 o_LED_1 <= not o_LED_1;
-                r_LastStateAsNumber <= r_StateAsNumber;
+                r_LastStateForDebugging <= r_StateForDebugging;
 
-                if r_StateAsNumber <= 9 then
-                    r_StateAsByte <= std_logic_vector(to_unsigned(48+r_StateAsNumber,r_StateAsByte'length));  -- 0-9
-                elsif r_StateAsNumber > 9 and r_StateAsNumber <= 15 then
-                    r_StateAsByte <= std_logic_vector(to_unsigned(65-10+r_StateAsNumber,r_StateAsByte'length));  -- A-F
+                if r_StateForDebugging <= 9 then
+                    r_StateAsByte <= std_logic_vector(to_unsigned(48+r_StateForDebugging,r_StateAsByte'length));  -- 0-9
+                elsif r_StateForDebugging > 9 and r_StateForDebugging <= 15 then
+                    r_StateAsByte <= std_logic_vector(to_unsigned(65-10+r_StateForDebugging,r_StateAsByte'length));  -- A-F
                 else
                     r_StateAsByte <= std_logic_vector(to_unsigned(63,r_StateAsByte'length));  -- '?'
                 end if;
@@ -170,8 +170,9 @@ begin
         if rising_edge(i_Clk) then
           if r_TempReading_Ready = '1' then
                r_TempInCelciusToDisplay <= r_TempInCelciusMSB;
+               o_LED_2 <= '1';
            else
-               r_TempInCelciusToDisplay <= 0;
+               o_LED_2 <= '0';
           end if;
         end if;
     end process process_updateTempToDisplay;
