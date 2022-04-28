@@ -49,8 +49,8 @@ architecture RTL of DisplayTempOnSevenSegment is
 
     signal r_StateForDebugging : integer range 0 to 99 := 0; --for debugging
     signal r_LastStateForDebugging : integer range 0 to 99 := 99; --for debugging
-    signal r_StateChanged    : std_logic := '1';  
-    signal r_StateAsByte     : std_logic_vector(7 downto 0) := "00111111" ; -- '?'
+    signal r_StateChanged    : std_logic := '0';  
+    signal r_StateAsByte     : std_logic_vector(7 downto 0);
 
     signal w_Segment1_A, w_Segment2_A : std_logic;
     signal w_Segment1_B, w_Segment2_B : std_logic;
@@ -132,8 +132,8 @@ begin
                 o_LED_1 <= not o_LED_1;
                 r_LastStateForDebugging <= r_StateForDebugging;
 
-                if r_StateForDebugging <= 9 then
-                    r_StateAsByte <= std_logic_vector(to_unsigned(48+r_StateForDebugging,r_StateAsByte'length));  -- 0-9
+                if r_StateForDebugging >= 0 and r_StateForDebugging <= 9 then
+                    r_StateAsByte <= std_logic_vector(to_unsigned(48 + r_StateForDebugging,r_StateAsByte'length));  -- 0-9
                 elsif r_StateForDebugging > 9 and r_StateForDebugging <= 15 then
                     r_StateAsByte <= std_logic_vector(to_unsigned(65-10+r_StateForDebugging,r_StateAsByte'length));  -- A-F
                 else
@@ -169,7 +169,7 @@ begin
     begin
         if rising_edge(i_Clk) then
           if r_TempReading_Ready = '1' then
-               r_TempInCelciusToDisplay <= r_TempInCelciusMSB;
+               r_TempInCelciusToDisplay <= r_TempInCelciusMSB ;
                o_LED_2 <= '1';
            else
                o_LED_2 <= '0';

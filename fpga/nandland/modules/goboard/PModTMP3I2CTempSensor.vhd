@@ -68,7 +68,7 @@ architecture RTL of PModTMP3I2CTempSensor is
 begin
 
     r_I2CAddr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_I2CAddr'length));
-    o_I2CStateForDebugging <= r_I2CStateForDebugging;
+    o_I2CStateForDebugging <= t_State'POS(r_State) ; 
 
      --Instantiate module to get temprature readings
      I2CDriver_Inst : entity work.I2CDriver

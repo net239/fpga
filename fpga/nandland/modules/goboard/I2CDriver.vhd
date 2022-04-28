@@ -235,7 +235,7 @@ begin
                         if  r_SCL = '1' then 
                              --send  bits MSB fist
                             -- so when r_DataToSlaveBit_Count is zero, we want to pick bit 8 
-                            o_ByteRead(o_ByteRead'length - 2 - r_DataFromSlaveBit_Count) <= r_SDA ; --I2C expects MSB first
+                            o_ByteRead(o_ByteRead'length - 1 - r_DataFromSlaveBit_Count) <= io_SDA ; --I2C expects MSB first
 
                             if r_DataFromSlaveBit_Count = (r_ByteToWrite'length - 1) then -- count only - 0,1,2,3,4,5,6,7 and then roll over                           
                                 r_DataFromSlaveBit_Count  <= 0;
