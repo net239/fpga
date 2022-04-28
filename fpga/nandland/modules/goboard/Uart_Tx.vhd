@@ -46,6 +46,9 @@ begin
         case r_UartReadingStateMachine is
         when state_Idle =>
             o_Uart_Tx_Active <= '0';
+            r_Clk_Count <= 0;
+            o_Uart_Serial_Tx <= '1';
+            r_Bit_Index  <= 0;
 
             if i_Byte_Ready_To_send ='1'  then
                 r_Byte_To_Send <= i_Byte_To_Send; -- lets keep a copy of byte, just in case the input changes
@@ -56,18 +59,25 @@ begin
            
         when state_TX_Start_Bit =>
             o_Uart_Tx_Active <= '1';
-            r_Bit_Index  <= 0;
-            r_Clk_Count  <= 0;
-
+            
             -- Send start Bit
             o_Uart_Serial_Tx <= '0';
 
-            r_UartReadingStateMachine <= state_TX_Data_Bits;
-        when state_TX_Data_Bits =>
             if r_Clk_Count = ( g_CLKS_PER_BIT-1)  then
                 r_Clk_Count <= 0;
-                o_Uart_Serial_Tx <= r_Byte_To_Send(r_Bit_Index);
+                r_UartReadingStateMachine <= state_TX_Data_Bits;
+            else
+                r_Clk_Count <= r_Clk_Count + 1;
+                r_UartReadingStateMachine <= state_TX_Start_Bit;
+            end if;
 
+        when state_TX_Data_Bits =>
+
+            o_Uart_Serial_Tx <= r_Byte_To_Send(r_Bit_Index);
+    
+            if r_Clk_Count = ( g_CLKS_PER_BIT-1)  then
+                r_Clk_Count <= 0;
+                
                 -- see if we sent all bits
                 if r_Bit_Index = 7 then
                     r_Bit_Index <= 0;
@@ -81,9 +91,9 @@ begin
                 r_UartReadingStateMachine <= state_TX_Data_Bits;
             end if;
         when state_TX_Stop_Bit =>
-            if r_Clk_Count = ( g_CLKS_PER_BIT-1)  then        
-                o_Uart_Serial_Tx <= '1';
+            o_Uart_Serial_Tx <= '1';
 
+            if r_Clk_Count = ( g_CLKS_PER_BIT-1)  then        
                 r_Clk_Count <= 0;
                 r_UartReadingStateMachine <= state_Cleanup;
             else
