@@ -44,13 +44,13 @@ end entity PModTMP3I2CTempSensor;
 architecture RTL of PModTMP3I2CTempSensor is
     signal r_ReadOrWriteOperation: work.I2CDriver_pkg.t_Request_Type := work.I2CDriver_pkg.IDLE; -- un initialized
     signal r_NumBytesToread : integer range 1 to 16;
+    signal r_TempReading_Ready  :  std_logic := '0';
 
     signal r_I2CByteRead  :  std_logic_vector(7 downto 0);
     signal r_I2CByteReady :  std_logic;
     signal r_I2CByteToWrite  :  std_logic_vector(7 downto 0);
 
     signal r_I2CRequest_Completion_State :   work.I2CDriver_pkg.t_Request_State;
-    signal r_I2CReadOrWrite :  std_logic;
     signal r_I2CAddr : std_logic_vector(6 downto 0);  --I2C expects MSB first
 
     signal r_I2CStateForDebugging          :   integer range 0 to 32; --for debugging      
@@ -60,7 +60,6 @@ architecture RTL of PModTMP3I2CTempSensor is
                 WRITE_REG_ADDRESS, -- register address that stores temprature, write this address to output
                 WAIT_WRITE_ACK, 
                 READ_MSB,
-                READ_LSB,
                 WAIT_READ_MSB_ACK,
                 WAIT_READ_LSB_ACK
             );
@@ -68,7 +67,8 @@ architecture RTL of PModTMP3I2CTempSensor is
 begin
 
     r_I2CAddr <= std_logic_vector(to_unsigned(I2C_DEVICE_ADDRESS,r_I2CAddr'length));
-    o_I2CStateForDebugging <= t_State'POS(r_State) ; 
+    o_I2CStateForDebugging <= r_I2CStateForDebugging ; 
+    o_TempReading_Ready <= r_TempReading_Ready;
 
      --Instantiate module to get temprature readings
      I2CDriver_Inst : entity work.I2CDriver
@@ -94,7 +94,8 @@ begin
         if rising_edge(i_Clk) then
             case r_State is
                 when IDLE =>
-                    o_TempReading_Ready <= '0';
+                    r_TempReading_Ready <= '0';
+                    r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;
                     r_State <= WRITE_REG_ADDRESS;
 
                 when WRITE_REG_ADDRESS =>
@@ -103,29 +104,44 @@ begin
                     r_State <= WAIT_WRITE_ACK;
                 when WAIT_WRITE_ACK =>
                     if r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
+                        r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;
                         r_State <= READ_MSB;
                     elsif r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                        r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;
                         r_State <= IDLE;    
                     end if;
                 when READ_MSB =>
-                    r_NumBytesToread <= 2;
-                    r_ReadOrWriteOperation <= work.I2CDriver_pkg.READ;  
-                    r_State <= WAIT_READ_MSB_ACK;
-                when WAIT_READ_MSB_ACK =>
-                    if r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
-                        o_TempInCelciusMSB <= r_I2CByteRead ;
-                        r_State <= READ_LSB;
-                    elsif r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
-                        r_State <= IDLE;    
+                    if r_I2CRequest_Completion_State = work.I2CDriver_pkg.IDLE then    
+                        r_NumBytesToread <= 2;
+                        r_ReadOrWriteOperation <= work.I2CDriver_pkg.READ;  
+                        r_State <= WAIT_READ_MSB_ACK;
                     end if;
-                when READ_LSB =>
-                    r_State <= WAIT_READ_LSB_ACK;
+                when WAIT_READ_MSB_ACK =>
+                    if  r_I2CRequest_Completion_State /= work.I2CDriver_pkg.COMPLETED_ERROR then
+                        if r_I2CByteReady = '1' then
+                            o_TempInCelciusMSB <= r_I2CByteRead;
+                            r_State <= WAIT_READ_LSB_ACK;
+                        else 
+                            r_TempReading_Ready <= '0';
+                            r_State <= WAIT_READ_MSB_ACK;
+                        end if;
+                    else
+                        r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;    
+                        r_State <= IDLE;            
+                    end if;
                 when WAIT_READ_LSB_ACK =>
-                    if r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
-                        o_TempInCelciusLSB <= r_I2CByteRead;
-                        o_TempReading_Ready <= '1';
-                        r_State <= IDLE;
-                    elsif r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_ERROR then
+                    if  r_I2CRequest_Completion_State /= work.I2CDriver_pkg.COMPLETED_ERROR then
+                        if r_I2CByteReady = '1' then    
+                            o_TempInCelciusLSB <= r_I2CByteRead;
+                            r_TempReading_Ready <= '1';
+                            r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;    
+                            r_State <= IDLE;
+                        else
+                            r_TempReading_Ready <= '0';
+                            r_State <= WAIT_READ_LSB_ACK;
+                        end if;
+                    else
+                        r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;    
                         r_State <= IDLE;    
                     end if;
                 when others =>

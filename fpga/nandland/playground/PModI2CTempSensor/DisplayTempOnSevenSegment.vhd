@@ -108,9 +108,6 @@ begin
     
     --Instantiate module to get temprature readings
     PModTMP3I2CTempSensor_Inst : entity work.PModTMP3I2CTempSensor
-        generic map (
-            g_CLKS_PER_BIT => 25000000/5
-        )
         port map (
             i_Clk        => i_Clk,
             o_TempInCelciusMSB   => r_TempInCelciusMSB,

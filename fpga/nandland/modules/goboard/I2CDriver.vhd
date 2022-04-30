@@ -77,8 +77,9 @@ architecture RTL of I2CDriver is
     signal r_SDA: std_logic := '1';
     signal r_SCL: std_logic := '1';
 
-    signal r_ReadingOrWtiting: work.I2CDriver_pkg.t_Request_Type;
+    signal r_ReadingOrWriting: work.I2CDriver_pkg.t_Request_Type;
     signal r_ByteToWrite :  std_logic_vector(7 downto 0);
+    signal r_ByteRead  :  std_logic_vector(7 downto 0);
 
     signal r_Clk_Count   : integer range 0 to g_CLKS_PER_BIT-1 := 0;
     
@@ -111,7 +112,7 @@ begin
             case r_I2C_State is
                 when IDLE =>
                     if i_ReadOrWriteOperation = work.I2CDriver_pkg.WRITE then -- write
-                        r_ReadingOrWtiting <= work.I2CDriver_pkg.WRITE;
+                        r_ReadingOrWriting <= work.I2CDriver_pkg.WRITE;
                         r_ByteToWrite <= i_ByteToWrite;
 
                         r_I2C_NextState <= START;
@@ -119,7 +120,7 @@ begin
                         o_Request_Completion_State <=  work.I2CDriver_pkg.WORKING;
 
                     elsif i_ReadOrWriteOperation = work.I2CDriver_pkg.READ then -- read
-                        r_ReadingOrWtiting <= work.I2CDriver_pkg.READ;
+                        r_ReadingOrWriting <= work.I2CDriver_pkg.READ;
                         r_NumBytesToread <= i_NumBytesToread;
 
                         r_I2C_NextState <= START;
@@ -132,6 +133,8 @@ begin
                 when START =>
                     r_DataToSlaveBit_Count <= 0;
                     r_DataFromSlaveBit_Count <= 0;
+                    o_ByteReady <= '0';
+                    
 
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 4 then
                          r_SDA <= '1'; -- set SDA high so we can pull it low and generate START condition
@@ -162,7 +165,7 @@ begin
                             if r_DataToSlaveBit_Count = (r_Addr'length - 2) then -- count only - 0,1,2,3,4,5,6 and then roll over                           
                                 r_DataToSlaveBit_Count  <= 0;
 
-                                if r_ReadingOrWtiting = work.I2CDriver_pkg.READ then
+                                if r_ReadingOrWriting = work.I2CDriver_pkg.READ then
                                     r_I2C_State <= SET_READ_BIT;
                                 else
                                     r_I2C_State <= SET_WRITE_BIT;
@@ -200,8 +203,9 @@ begin
                             if io_SDA = '0' then -- check if the SDA is still low
                                 r_DataToSlaveBit_Count  <= 0;
                                 r_DataFromSlaveBit_Count <= 0;
+                                o_ByteReady <= '0';    
 
-                                if r_ReadingOrWtiting = work.I2CDriver_pkg.READ then
+                                if r_ReadingOrWriting = work.I2CDriver_pkg.READ then
                                     r_I2C_State <= READ_DATA;
                                 else
                                     r_I2C_State <= WRITE_DATA;
@@ -233,31 +237,32 @@ begin
                 when READ_DATA =>
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '1' then 
-                             --send  bits MSB fist
+                             --bits MSB fist
                             -- so when r_DataToSlaveBit_Count is zero, we want to pick bit 8 
-                            o_ByteRead(o_ByteRead'length - 1 - r_DataFromSlaveBit_Count) <= io_SDA ; --I2C expects MSB first
+                            r_ByteRead(r_ByteRead'length - 1 - r_DataFromSlaveBit_Count) <= io_SDA ; --I2C expects MSB first
 
                             if r_DataFromSlaveBit_Count = (r_ByteToWrite'length - 1) then -- count only - 0,1,2,3,4,5,6,7 and then roll over                           
                                 r_DataFromSlaveBit_Count  <= 0;
                                 r_NumBytesToread <= r_NumBytesToread - 1;
                                 r_I2C_State <= SEND_READ_ACK;
-
-                                o_Request_Completion_State <=  work.I2CDriver_pkg.COMPLETED_OK;
+                                o_ByteReady <= '1';
+                                o_ByteRead <= r_ByteRead;
                             else
                                 r_DataFromSlaveBit_Count <= r_DataFromSlaveBit_Count + 1;
                             end if;
                         end if;
                     end if;    
                 when SEND_READ_ACK =>
+                    o_ByteReady <= '0';                
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then -- change data only when SCL is low
                             r_SDA <= '0'; -- Set this to 0 - ACK
 
                             if r_NumBytesToread = 0 then
+                                o_Request_Completion_State <=  work.I2CDriver_pkg.COMPLETED_OK;
                                 r_I2C_NextState <= IDLE;
                                 r_I2C_State <= SET_NEXT_STATE;
                             else
-                                o_Request_Completion_State <=  work.I2CDriver_pkg.WORKING;
                                 r_I2C_State <= READ_DATA;
                             end if;
                         end if;
