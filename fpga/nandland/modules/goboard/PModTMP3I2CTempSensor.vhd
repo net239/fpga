@@ -94,14 +94,18 @@ begin
         if rising_edge(i_Clk) then
             case r_State is
                 when IDLE =>
-                    r_TempReading_Ready <= '0';
+                   
                     r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;
                     r_State <= WRITE_REG_ADDRESS;
 
                 when WRITE_REG_ADDRESS =>
-                    r_I2CByteToWrite <= std_logic_vector(to_unsigned(I2C_DEVICE_TEMP_REGISTER,r_I2CByteToWrite'length));
-                    r_ReadOrWriteOperation <= work.I2CDriver_pkg.WRITE;  
-                    r_State <= WAIT_WRITE_ACK;
+                    -- wait for I2C to go idle
+                    if r_I2CRequest_Completion_State = work.I2CDriver_pkg.IDLE then    
+                        r_TempReading_Ready <= '0';
+                        r_I2CByteToWrite <= std_logic_vector(to_unsigned(I2C_DEVICE_TEMP_REGISTER,r_I2CByteToWrite'length));
+                        r_ReadOrWriteOperation <= work.I2CDriver_pkg.WRITE;  
+                        r_State <= WAIT_WRITE_ACK;
+                    end if;
                 when WAIT_WRITE_ACK =>
                     if r_I2CRequest_Completion_State = work.I2CDriver_pkg.COMPLETED_OK then
                         r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;
@@ -111,6 +115,7 @@ begin
                         r_State <= IDLE;    
                     end if;
                 when READ_MSB =>
+                    -- wait for I2C to go idle    
                     if r_I2CRequest_Completion_State = work.I2CDriver_pkg.IDLE then    
                         r_NumBytesToread <= 2;
                         r_ReadOrWriteOperation <= work.I2CDriver_pkg.READ;  
@@ -122,7 +127,6 @@ begin
                             o_TempInCelciusMSB <= r_I2CByteRead;
                             r_State <= WAIT_READ_LSB_ACK;
                         else 
-                            r_TempReading_Ready <= '0';
                             r_State <= WAIT_READ_MSB_ACK;
                         end if;
                     else
@@ -137,7 +141,6 @@ begin
                             r_ReadOrWriteOperation <= work.I2CDriver_pkg.IDLE;    
                             r_State <= IDLE;
                         else
-                            r_TempReading_Ready <= '0';
                             r_State <= WAIT_READ_LSB_ACK;
                         end if;
                     else
