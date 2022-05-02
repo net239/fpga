@@ -105,6 +105,7 @@ architecture RTL of Seven_Segment_LED_Counter is
     SevenSeg1_Inst : entity work.Binary_To_7Segment
         port map (
         i_Clk        => i_Clk,
+        i_display_off => '0',
         i_Binary_Num => std_logic_vector(to_unsigned(r_Count mod 10, 4)),
         o_Segment_A  => w_Segment2_A,
         o_Segment_B  => w_Segment2_B,
@@ -118,6 +119,7 @@ architecture RTL of Seven_Segment_LED_Counter is
     SevenSeg2_Inst : entity work.Binary_To_7Segment
         port map (
         i_Clk        => i_Clk,
+        i_display_off => '0',
         i_Binary_Num => std_logic_vector(to_unsigned(r_Count / 10, 4)),
         o_Segment_A  => w_Segment1_A,
         o_Segment_B  => w_Segment1_B,

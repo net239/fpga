@@ -116,6 +116,7 @@ architecture RTL of Uart_To_VGA is
     SevenSeg1_Inst : entity work.Binary_To_7Segment
         port map (
         i_Clk        => i_Clk,
+        i_display_off => '0',
         i_Binary_Num => r_byte_read(7 downto 4),
         o_Segment_A  => w_Segment1_A,
         o_Segment_B  => w_Segment1_B,
@@ -129,6 +130,7 @@ architecture RTL of Uart_To_VGA is
     SevenSeg2_Inst : entity work.Binary_To_7Segment
         port map (
         i_Clk        => i_Clk,
+        i_display_off => '0',
         i_Binary_Num => r_byte_read(3 downto 0),
         o_Segment_A  => w_Segment2_A,
         o_Segment_B  => w_Segment2_B,
@@ -170,51 +172,7 @@ architecture RTL of Uart_To_VGA is
     -- send output only when UART TX is active
     o_UART_TX <= r_UART_TX   when r_Uart_Tx_Active = '1'  else '1';
 
-    -- simple function to display square grid on VGA - for testing purposes
-    -- process_draw : process (i_Clk)
-    -- begin
-    --     if rising_edge(i_Clk) then
-    --         if r_isVideoOn = '1' then
-    --             if r_hPos mod 20 = 0 or r_hPos = 639 or r_vPos mod 20 = 0 or r_vPos = 479 then
-    --                 o_VGA_Red_0 <= '1';
-    --                 o_VGA_Red_1 <= '0';
-    --                 o_VGA_Red_2 <= '1';
-
-    --                 o_VGA_Grn_0 <= '1';
-    --                 o_VGA_Grn_1 <= '0';
-    --                 o_VGA_Grn_1 <= '1';
-
-    --                 o_VGA_Blu_0 <= '1';
-    --                 o_VGA_Blu_1 <= '0';
-    --                 o_VGA_Blu_2 <= '1';
-    --             else
-    --                 o_VGA_Red_0 <= '0';
-    --                 o_VGA_Red_1 <= '0';
-    --                 o_VGA_Red_2 <= '0';
-
-    --                 o_VGA_Grn_0 <= '0';
-    --                 o_VGA_Grn_1 <= '0';
-    --                 o_VGA_Grn_1 <= '0';
-
-    --                 o_VGA_Blu_0 <= '0';
-    --                 o_VGA_Blu_1 <= '0';
-    --                 o_VGA_Blu_2 <= '0';
-    --             end if;
-    --         else
-    --             o_VGA_Red_0 <= '0';
-    --             o_VGA_Red_1 <= '0';
-    --             o_VGA_Red_2 <= '0';
-
-    --             o_VGA_Grn_0 <= '0';
-    --             o_VGA_Grn_1 <= '0';
-    --             o_VGA_Grn_1 <= '0';
-
-    --             o_VGA_Blu_0 <= '0';
-    --             o_VGA_Blu_1 <= '0';
-    --             o_VGA_Blu_2 <= '0';
-    --         end if;
-    --     end if; 
-    -- end process process_draw;
+    
 
     -- fetch the byte to be displayed     
     process_updateByteToDisplay : process (i_Clk)

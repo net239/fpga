@@ -5,7 +5,8 @@ use ieee.std_logic_1164.all;
 -- refer: https://en.wikipedia.org/wiki/Seven-segment_display
 entity Binary_To_7Segment is
   port (
-    i_Clk        : in  std_logic;
+    i_Clk               : in  std_logic;
+    i_display_off       : in  std_logic;  -- switch off
     i_Binary_Num : in  std_logic_vector(3 downto 0);
     o_Segment_A  : out std_logic;
     o_Segment_B  : out std_logic;
@@ -26,42 +27,46 @@ begin
     process (i_Clk) is
     begin
         if rising_edge(i_Clk) then
-            case i_Binary_Num is
-                when "0000" =>
-                    r_Hex_Encoding <= X"7E";
-                when "0001" =>
-                    r_Hex_Encoding <= X"30";
-                when "0010" =>
-                    r_Hex_Encoding <= X"6D";
-                when "0011" =>
-                    r_Hex_Encoding <= X"79";
-                when "0100" =>
-                    r_Hex_Encoding <= X"33";          
-                when "0101" =>
-                    r_Hex_Encoding <= X"5B";
-                when "0110" =>
-                    r_Hex_Encoding <= X"5F";
-                when "0111" =>
-                    r_Hex_Encoding <= X"70";
-                when "1000" =>
-                    r_Hex_Encoding <= X"7F";
-                when "1001" =>
-                    r_Hex_Encoding <= X"7B";
-                when "1010" =>
-                    r_Hex_Encoding <= X"77";
-                when "1011" =>
-                    r_Hex_Encoding <= X"1F";
-                when "1100" =>
-                    r_Hex_Encoding <= X"4E";
-                when "1101" =>
-                    r_Hex_Encoding <= X"3D";
-                when "1110" =>
-                    r_Hex_Encoding <= X"4F";
-                when "1111" =>
-                    r_Hex_Encoding <= X"47";
-                when others =>
-                    r_Hex_Encoding <= X"00"; 
-            end case;
+            if i_display_off = '1' then
+                r_Hex_Encoding <= X"00"; 
+            else 
+                case i_Binary_Num is
+                    when "0000" =>
+                        r_Hex_Encoding <= X"7E";
+                    when "0001" =>
+                        r_Hex_Encoding <= X"30";
+                    when "0010" =>
+                        r_Hex_Encoding <= X"6D";
+                    when "0011" =>
+                        r_Hex_Encoding <= X"79";
+                    when "0100" =>
+                        r_Hex_Encoding <= X"33";          
+                    when "0101" =>
+                        r_Hex_Encoding <= X"5B";
+                    when "0110" =>
+                        r_Hex_Encoding <= X"5F";
+                    when "0111" =>
+                        r_Hex_Encoding <= X"70";
+                    when "1000" =>
+                        r_Hex_Encoding <= X"7F";
+                    when "1001" =>
+                        r_Hex_Encoding <= X"7B";
+                    when "1010" =>
+                        r_Hex_Encoding <= X"77";
+                    when "1011" =>
+                        r_Hex_Encoding <= X"1F";
+                    when "1100" =>
+                        r_Hex_Encoding <= X"4E";
+                    when "1101" =>
+                        r_Hex_Encoding <= X"3D";
+                    when "1110" =>
+                        r_Hex_Encoding <= X"4F";
+                    when "1111" =>
+                        r_Hex_Encoding <= X"47";
+                    when others =>
+                        r_Hex_Encoding <= X"00"; 
+                end case;
+            end if;
         end if;
   end process;
  
