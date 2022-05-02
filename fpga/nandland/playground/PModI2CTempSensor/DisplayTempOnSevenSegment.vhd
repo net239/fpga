@@ -1,6 +1,7 @@
 library ieee;
-use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use ieee.std_logic_1164.all;
+
 
 -- Display current temprature on 7 segment LED display
 entity DisplayTempOnSevenSegment is
@@ -41,10 +42,10 @@ entity DisplayTempOnSevenSegment is
 end entity DisplayTempOnSevenSegment;
 
 architecture RTL of DisplayTempOnSevenSegment is
-    signal r_TempInCelciusMSB     : std_logic_vector(7 downto 0);  --byte read from Temp sensor
-    signal r_TempInCelciusLSB     : std_logic_vector(7 downto 0);  --byte read from Temp sensor
+    signal r_TempInCelciusMSB       : std_logic_vector(7 downto 0);  --byte read from Temp sensor
+    signal r_TempInCelciusLSB       : std_logic_vector(7 downto 0);  --byte read from Temp sensor
     signal r_TempInCelciusToDisplay : std_logic_vector(7 downto 0) := 0;
-    signal r_TempReading_Ready    : std_logic := '0';  -- reading from Temp sensor is ready 
+    signal r_TempReading_Ready      : std_logic := '0';  -- reading from Temp sensor is ready 
 
     signal r_StateForDebugging : integer range 0 to 99 := 0; --for debugging
     signal r_LastStateForDebugging : integer range 0 to 99 := 99; --for debugging
@@ -179,16 +180,19 @@ begin
         if rising_edge(i_Clk) then
             if r_TempReading_Ready = '1' then
                 r_CountCyclesSinceNoTempReady <= 0;
-                r_display_off <= '0';
-                r_TempInCelciusToDisplay <= r_TempInCelciusMSB ;
-            else
-                r_CountCyclesSinceNoTempReady <= r_CountCyclesSinceNoTempReady  + 1;
+          
+                --convert to decimals
+                r_TempInCelciusToDisplay(7 downto 4) <= std_logic_vector( to_unsigned((to_integer( unsigned(r_TempInCelciusMSB))) / 10 , 4) );
+                r_TempInCelciusToDisplay(3 downto 0) <= std_logic_vector( to_unsigned((to_integer( unsigned(r_TempInCelciusMSB))) mod 10, 4) );
 
+                r_display_off <= '0';
+            else
                 -- switch of display if no temprature for long time
-                if r_CountCyclesSinceNoTempReady >= 10000 then
+                if r_CountCyclesSinceNoTempReady = 10000 then
                     r_display_off <= '1';
                     r_TempInCelciusToDisplay <= 0;
                 end if;
+                r_CountCyclesSinceNoTempReady <= r_CountCyclesSinceNoTempReady  + 1;
           end if;
         end if;
     end process process_updateTempToDisplay;

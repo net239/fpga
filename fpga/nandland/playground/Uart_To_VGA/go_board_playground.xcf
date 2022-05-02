@@ -18,6 +18,8 @@
 				<BScanVal>0</BScanVal>
 			</Bypass>
 			<File>D:/jsahni/projects/fpga/nandland/playground/PModI2CTempSensor/pmodi2ctempsensor_Implmnt/sbt/outputs/bitmap/DisplayTempOnSevenSegment_bitmap.bin</File>
+			<FileTime>05/02/22 14:00:12</FileTime>
+			<JedecChecksum>0xFB6B</JedecChecksum>
 			<Operation>SPI Flash Erase,Program,Verify</Operation>
 			<Option>
 				<SVFVendor>JTAG STANDARD</SVFVendor>
