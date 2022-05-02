@@ -253,7 +253,7 @@ begin
                         end if;
                     end if;    
                 when SEND_READ_ACK =>
-                    o_ByteReady <= '0';                
+                    o_ByteReady <= '0';  -- we should reset  byteRead back to zero, so reader does not read same byte again
                     if r_Clk_Count = ( g_CLKS_PER_BIT-1) / 2 then 
                         if  r_SCL = '0' then -- change data only when SCL is low
                             r_SDA <= '0'; -- Set this to 0 - ACK
